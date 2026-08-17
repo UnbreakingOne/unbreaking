@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cool Dark Theme App</title>
+    <style>
+        /* --- Custom Font Setup --- */
+        @font-face {
+            font-family: 'Mojangles';
+            src: url('Mojangles.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+
+        /* --- Base Page Setup --- */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Mojangles', 'Courier New', Courier, monospace; 
+        }
+
+        body {
+            background-color: #0a0a0a;
+            color: #ffffff;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* --- Sidebar Styles --- */
+        .sidebar {
+            width: 90px;
+            background: linear-gradient(180deg, #121212 0%, #1a1a1a 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 30px 0;
+            border-right: 1px solid #333;
+            box-shadow: 5px 0 15px rgba(0, 0, 0, 0.5);
+            z-index: 10;
+            flex-shrink: 0;
+        }
+
+        .sidebar-link {
+            margin-bottom: 20px;
+            display: block;
+            border-radius: 12px;
+            position: relative;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        /* Standard image links */
+        .sidebar-link img {
+            width: 50px;
+            height: 50px;
+            object-fit: cover;
+            border-radius: 12px;
+            transition: all 0.4s ease;
+            opacity: 0.7;
+            display: block;
+        }
+
+        /* New Symbol Icon Links (for ⛶ and ⟳) */
+        .icon-symbol {
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 26px;
+            color: #ccc;
+            background-color: #1e1e1e;
+            border-radius: 12px;
+            transition: all 0.4s ease;
+            border: 1px solid transparent;
+        }
+
+        /* Sidebar Tooltip */
+        .sidebar-link .tooltip {
+            position: absolute;
+            left: 70px;
+            top: 50%;
+            transform: translateY(-50%);
+            background-color: #1e1e1e;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.3s ease;
+            border: 1px solid #bf00ff;
+            box-shadow: 0 0 10px rgba(191, 0, 255, 0.4);
+            z-index: 999;
+        }
+
+        /* Hover effects */
+        .sidebar-link:hover img {
+            opacity: 1;
+            transform: scale(1.15) rotate(5deg);
+            box-shadow: 0 0 15px rgba(191, 0, 255, 0.8);
+        }
+
+        .sidebar-link:hover .icon-symbol {
+            transform: scale(1.15) rotate(5deg);
+            box-shadow: 0 0 15px rgba(191, 0, 255, 0.8);
+            border-color: #bf00ff;
+            color: #bf00ff;
+            text-shadow: 0 0 10px rgba(191, 0, 255, 0.8);
+        }
+
+        .sidebar-link:hover .tooltip {
+            opacity: 1;
+            left: 80px;
+        }
+
+        .sidebar-extra-img {
+            margin-top: auto; 
+            width: 50px;
+            height: 50px;
+            border-radius: 50%; 
+            opacity: 0.4;
+            margin-bottom: 10px;
+            pointer-events: none; 
+        }
+
+        .sidebar-divider {
+            width: 50px;
+            height: 2px;
+            background-color: #333;
+            margin: 10px 0 25px 0;
+        }
+
+        /* --- Main Content Area --- */
+        .main-content {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 30px 40px;
+            height: 100vh;
+            overflow: hidden;
+            z-index: 1;
+        }
+
+        /* --- Iframe Styles --- */
+        .content-frame {
+            width: 100%;
+            height: 100%;
+            flex-grow: 1;
+            border: 2px solid #333;
+            border-radius: 20px;
+            display: none; 
+            box-shadow: 0 0 30px rgba(191, 0, 255, 0.2);
+            background-color: #121212;
+            transition: all 0.5s ease;
+        }
+
+        /* --- Custom Internal Page Styles --- */
+        .custom-page-container {
+            width: 100%;
+            height: 100%;
+            flex-grow: 1;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            background-color: #121212;
+            border: 2px solid #333;
+            border-radius: 20px;
+            box-shadow: 0 0 30px rgba(191, 0, 255, 0.2);
+            animation: fadeIn 0.5s ease-out;
+            padding: 40px;
+        }
+
+        .custom-page-container h1 {
+            font-size: 3rem;
+            color: #bf00ff;
+            margin-bottom: 20px;
+            text-shadow: 0 0 15px rgba(191, 0, 255, 0.6);
+        }
+
+        .custom-page-container p {
+            font-size: 1.2rem;
+            color: #ccc;
+            margin-bottom: 40px;
+            max-width: 600px;
+            line-height: 1.6;
+        }
+
+        .real-link-btn {
+            padding: 15px 40px;
+            font-size: 1.2rem;
+            color: white;
+            background: transparent;
+            border: 2px solid #bf00ff;
+            border-radius: 30px;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 15px rgba(191, 0, 255, 0.4);
+            cursor: pointer;
+            display: inline-block;
+        }
+
+        .real-link-btn:hover {
+            background: #bf00ff;
+            box-shadow: 0 0 25px rgba(191, 0, 255, 0.8);
+            transform: scale(1.05);
+        }
+
+        /* --- Search Bar Styles --- */
+        .search-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px; 
+            animation: slideDown 0.8s ease-out;
+            flex-shrink: 0;
+        }
+
+        .search-bar {
+            width: 100%;
+            max-width: 600px;
+            padding: 15px 25px;
+            font-size: 18px;
+            background-color: #1e1e1e;
+            color: white;
+            border: 2px solid #333;
+            border-radius: 30px;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .search-bar:focus {
+            border-color: #bf00ff;
+            box-shadow: 0 0 20px rgba(191, 0, 255, 0.6);
+            transform: scale(1.02);
+            background-color: #121212;
+        }
+
+        /* --- Image Grid Styles --- */
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 30px;
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+            overflow-y: auto; 
+            padding: 20px; 
+        }
+
+        .grid-container::-webkit-scrollbar { width: 8px; }
+        .grid-container::-webkit-scrollbar-track { background: #1a1a1a; border-radius: 10px; margin-top: 20px; margin-bottom: 20px; }
+        .grid-container::-webkit-scrollbar-thumb { background: #bf00ff; border-radius: 10px; }
+
+        .grid-item {
+            position: relative;
+            border-radius: 20px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            animation: fadeIn 1s ease-out backwards;
+            background-color: #000;
+            height: 200px; 
+        }
+
+        .grid-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+            transition: all 0.5s ease;
+            filter: brightness(80%);
+        }
+
+        .grid-item .center-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.8);
+            color: white;
+            font-size: 26px;
+            text-shadow: 0 0 10px #bf00ff, 0 0 20px #bf00ff, 0 0 30px #000;
+            opacity: 0;
+            transition: all 0.4s ease;
+            pointer-events: none;
+            text-align: center;
+            width: 90%; 
+            white-space: normal; 
+            word-wrap: break-word; 
+            line-height: 1.2; 
+        }
+
+        .grid-item:hover {
+            transform: translateY(-10px) scale(1.03);
+            box-shadow: 0 15px 30px rgba(191, 0, 255, 0.5);
+            z-index: 2;
+        }
+
+        .grid-item:hover img {
+            filter: brightness(30%);
+            transform: scale(1.1);
+        }
+
+        .grid-item:hover .center-text {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        .grid-item:nth-child(1) { animation-delay: 0.1s; }
+        .grid-item:nth-child(2) { animation-delay: 0.2s; }
+        .grid-item:nth-child(3) { animation-delay: 0.3s; }
+        .grid-item:nth-child(4) { animation-delay: 0.4s; }
+        .grid-item:nth-child(5) { animation-delay: 0.5s; }
+        .grid-item:nth-child(6) { animation-delay: 0.6s; }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.8); }
+            to { opacity: 1; transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="sidebar">
+        <div class="sidebar-link interactive-link" data-url="home">
+            <img src="https://via.placeholder.com/100/333333/bf00ff?text=H" alt="Home">
+            <span class="tooltip">Home View</span>
+        </div>
+        <div class="sidebar-link interactive-link" data-url="special-page">
+            <img src="https://via.placeholder.com/100/333333/bf00ff?text=S" alt="Special Page">
+            <span class="tooltip">Special Page</span>
+        </div>
+        
+        <div class="sidebar-link interactive-link" data-url="https://en.wikipedia.org/wiki/Main_Page">
+            <img src="https://via.placeholder.com/100/333333/bf00ff?text=W" alt="Wiki">
+            <span class="tooltip">Wikipedia</span>
+        </div>
+
+        <div class="sidebar-link" id="googleSidebarBtn">
+            <img src="https://via.placeholder.com/100/333333/bf00ff?text=G" alt="Google">
+            <span class="tooltip">Open Google</span>
+        </div>
+
+        <div class="sidebar-divider"></div>
+
+        <div class="sidebar-link action-btn" id="btnFullscreen">
+            <div class="icon-symbol">⛶</div>
+            <span class="tooltip">Fullscreen Iframe</span>
+        </div>
+        <div class="sidebar-link action-btn" id="btnRefresh">
+            <div class="icon-symbol">⟳</div>
+            <span class="tooltip">Refresh Iframe</span>
+        </div>
+
+        <img class="sidebar-extra-img" src="https://via.placeholder.com/100/111111/555555?text=Img" alt="Bottom Image">
+    </nav>
+
+    <main class="main-content">
+        
+        <iframe id="contentFrame" class="content-frame"></iframe>
+
+        <div id="customPage" class="custom-page-container">
+            <h1>Secret Hub Page</h1>
+            <p>Welcome to the custom internal page! This page replaces the grid but isn't loaded from an external website. You can put any custom HTML you want right here.</p>
+            <div id="googleInternalBtn" class="real-link-btn">Open Google in New Tab</div>
+        </div>
+
+        <div class="search-container" id="searchContainer">
+            <input type="text" id="searchBar" class="search-bar" placeholder="Type a link name to filter...">
+        </div>
+
+        <div class="grid-container" id="gridContainer">
+            <div class="grid-item interactive-link" data-name="games gaming" data-url="https://en.wikipedia.org/wiki/Video_game">
+                <img src="https://via.placeholder.com/400x300/1a1a1a/bf00ff?text=Games" alt="Games">
+                <div class="center-text">AWESOME GAMES</div>
+            </div>
+            
+            <div class="grid-item interactive-link" data-name="music beats audio" data-url="https://en.wikipedia.org/wiki/Music">
+                <img src="https://via.placeholder.com/400x300/1a1a1a/bf00ff?text=Music" alt="Music">
+                <div class="center-text">SICK BEATS</div>
+            </div>
+            
+            <div class="grid-item interactive-link" data-name="videos movies youtube" data-url="https://en.wikipedia.org/wiki/Video">
+                <img src="https://via.placeholder.com/400x300/1a1a1a/bf00ff?text=Videos" alt="Videos">
+                <div class="center-text">COOL VIDEOS</div>
+            </div>
+            
+            <div class="grid-item interactive-link" data-name="art drawing design" data-url="https://en.wikipedia.org/wiki/Art">
+                <img src="https://via.placeholder.com/400x300/1a1a1a/bf00ff?text=Art" alt="Art">
+                <div class="center-text">DIGITAL ART</div>
+            </div>
+            
+            <div class="grid-item interactive-link" data-name="code coding programming" data-url="https://en.wikipedia.org/wiki/Computer_programming">
+                <img src="https://via.placeholder.com/400x300/1a1a1a/bf00ff?text=Code" alt="Code">
+                <div class="center-text">COMPLEX CODING PROJECTS</div>
+            </div>
+            
+            <div class="grid-item interactive-link" data-name="social chat friends" data-url="https://en.wikipedia.org/wiki/Social_media">
+                <img src="https://via.placeholder.com/400x300/1a1a1a/bf00ff?text=Social" alt="Social">
+                <div class="center-text">SOCIAL MEDIA</div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const searchInput = document.getElementById('searchBar');
+        const gridItems = document.querySelectorAll('.grid-item');
+
+        searchInput.addEventListener('input', function(event) {
+            const searchText = event.target.value.toLowerCase();
+            gridItems.forEach(function(item) {
+                const itemName = item.getAttribute('data-name').toLowerCase();
+                if (itemName.includes(searchText)) {
+                    item.style.display = 'block';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        });
+
+        const interactiveLinks = document.querySelectorAll('.interactive-link');
+        const contentFrame = document.getElementById('contentFrame');
+        const gridContainer = document.getElementById('gridContainer');
+        const searchContainer = document.getElementById('searchContainer');
+        const customPage = document.getElementById('customPage');
+
+        interactiveLinks.forEach(link => {
+            link.addEventListener('click', function() {
+                const targetUrl = this.getAttribute('data-url');
+
+                contentFrame.style.display = 'none';
+                gridContainer.style.display = 'none';
+                searchContainer.style.display = 'none';
+                customPage.style.display = 'none';
+
+                if (targetUrl === 'home') {
+                    contentFrame.src = ''; 
+                    gridContainer.style.display = 'grid';
+                    searchContainer.style.display = 'flex';
+                } else if (targetUrl === 'special-page') {
+                    contentFrame.src = ''; 
+                    customPage.style.display = 'flex';
+                } else {
+                    contentFrame.src = targetUrl;
+                    contentFrame.style.display = 'block';
+                }
+            });
+        });
+
+        /* --- Javascript Triggers for Hidden URL Links --- */
+        document.getElementById('googleSidebarBtn').addEventListener('click', () => {
+            window.open('https://google.com', '_blank');
+        });
+
+        document.getElementById('googleInternalBtn').addEventListener('click', () => {
+            window.open('https://google.com', '_blank');
+        });
+
+        const btnFullscreen = document.getElementById('btnFullscreen');
+        btnFullscreen.addEventListener('click', () => {
+            if (contentFrame.style.display === 'block') {
+                if (contentFrame.requestFullscreen) {
+                    contentFrame.requestFullscreen();
+                } else if (contentFrame.webkitRequestFullscreen) {
+                    contentFrame.webkitRequestFullscreen();
+                } else if (contentFrame.msRequestFullscreen) {
+                    contentFrame.msRequestFullscreen();
+                }
+            } else {
+                alert("Please open an external link in the iframe before making it fullscreen!");
+            }
+        });
+
+        const btnRefresh = document.getElementById('btnRefresh');
+        btnRefresh.addEventListener('click', () => {
+            if (contentFrame.style.display === 'block' && contentFrame.src !== '') {
+                const currentUrl = contentFrame.src;
+                contentFrame.src = currentUrl;
+            } else {
+                alert("No external page is currently open to refresh.");
+            }
+        });
+    </script>
+</body>
+</html>
