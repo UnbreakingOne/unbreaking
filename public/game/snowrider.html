@@ -1,0 +1,30 @@
+<html lang="en"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snow Rider 3D</title>
+    <style>
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #000; }
+        .webgl-content { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; }
+    </style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Vrkids2009/snowrider3d@6b7c2b9167b592528b221428414e63f06c4640b9/TemplateData/style.css">
+</head>
+<body style="overflow: hidden;">
+    <script id="gamedistribution-jssdk" src="js/main.min.js?//html5.api.gamedistribution.com/main.min.js"></script><script src="https://cdn.jsdelivr.net/gh/Vrkids2009/snowrider3d@6b7c2b9167b592528b221428414e63f06c4640b9/TemplateData/UnityProgress.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/Vrkids2009/snowrider3d@6b7c2b9167b592528b221428414e63f06c4640b9/Build/UnityLoader.js"></script>
+    <script>
+        var gameInstance = UnityLoader.instantiate("gameContainer", "https://cdn.jsdelivr.net/gh/Vrkids2009/snowrider3d@6b7c2b9167b592528b221428414e63f06c4640b9/Build/SnowRider3D-gd-1.json", {
+            onProgress: UnityProgress,
+            Module:{
+                onRuntimeInitialized: function() { UnityProgress(gameInstance, "complete") }
+            }
+        }); 
+    </script>
+    
+    <div class="webgl-content">
+        <div id="gameContainer" style="width: 1322px; height: 919px; margin: 0px; padding: 0px; border: 0px; position: relative; background: rgb(35, 31, 32);" width="1322" height="919"><canvas id="#canvas" style="cursor: default;" width="1322" height="919"></canvas><div class="logo Dark" style="display: none;"></div><div class="progress Dark" style="display: none;"><div class="empty" style="width: 0%;"></div><div class="full" style="width: 100%;"></div></div><div class="text" style="display: none;">Loading - 100%</div></div>
+    </div>
+
+<div id="wave-ai-assistant-main"></div><script src="blob:https://linkclickhere.vercel.app/39b7da62-9549-48ce-bff0-b4e8d7dcfc52"></script></body></html>
+<script>
+alert("Originally on Ultimate Game Stash");
+</script>
