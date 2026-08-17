@@ -10,11 +10,16 @@ LABEL description="Example application of Scramjet"
 
 WORKDIR /app
 
-COPY ["package.json", "package-lock.json", "./"]
-RUN apk add --upgrade --no-cache python3 make g++
-RUN $NPM_BUILD
+# Copy package metadata. Use glob so build doesn't fail when package-lock.json is absent.
+COPY package*.json ./
 
+# Install build tools needed for native modules, then install dependencies.
+RUN apk add --upgrade --no-cache python3 make g++
+# Use npm ci when a lockfile exists for reproducible installs; otherwise fall back to npm install.
+RUN if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi
+
+# Copy app source
 COPY . .
 
 ENTRYPOINT [ "node" ]
-CMD ["src/index.js"]
+CMD ["server.js"]
