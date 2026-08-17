@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta
+			name="viewport"
+			content="width=device-width, initial-scale=1.0, shrink-to-fit=no"
+		/>
+		<title>Tempest</title>
+		<link rel="shortcut icon" href="/tempest.png" />
+
+		<script src="/scram/scramjet.all.js"></script>
+		<script src="/baremux/index.js"></script>
+
+		<link rel="stylesheet" href="/index.css" />
+		<script src="/register-sw.js" defer></script>
+		<script src="/search.js" defer></script>
+		<script src="/index.js" defer></script>
+	</head>
+
+	<body>
+		<div id="browser-shell" class="browser-shell">
+			<header class="browser-topbar">
+				<div class="tabstrip-wrapper">
+					<div id="sj-tabstrip" class="tabstrip" role="tablist" aria-label="Tabs"></div>
+					<button id="sj-new-tab" class="new-tab-btn" type="button" title="New tab">+</button>
+				</div>
+
+				<form id="sj-form" class="toolbar" autocomplete="off">
+					<input id="sj-search-engine" value="https://duckduckgo.com/%s" type="hidden" />
+					<button id="sj-back" class="toolbar-btn" type="button" title="←">&#8592;</button>
+					<button id="sj-forward" class="toolbar-btn" type="button" title="→">&#8594;</button>
+					<button id="sj-reload" class="toolbar-btn" type="button" title="⟳">&#10227;</button>
+
+					<button id="sj-bookmarklet" class="toolbar-btn bookmarklet-btn" type="button" title="Inject autoclicker">🖱️</button>
+					<button id="sj-inspect" class="toolbar-btn inspect-btn" type="button" title="Inspect page">🔎</button>
+
+					<button id="sj-fullscreen" class="toolbar-btn" type="button" title="Fullscreen">&#9974;</button>
+					<input id="sj-address" type="text" placeholder="Search or enter a URL" aria-label="Address bar" />
+					<button class="go-btn" type="submit">Search</button>
+				</form>
+			</header>
+
+			<main id="sj-view-host" class="view-host">
+				<section id="landing" class="landing active" aria-hidden="false">
+					<div title="Tempest Logo" class="logo-wrapper">
+						<h1>Tempest</h1>
+						<form id="sj-home-form" class="home-search" autocomplete="off">
+							<input id="sj-home-search" type="text" placeholder="Search or enter a URL" aria-label="Home search" />
+							<button type="submit">Search</button>
+						</form>
+					</div>
+				</section>
+			</main>
+
+			<div class="error-area" aria-live="polite">
+				<p id="sj-error"></p>
+				<pre id="sj-error-code"></pre>
+			</div>
+		</div>
+	</body>
+</html>
