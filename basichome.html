@@ -219,11 +219,12 @@
             margin-bottom: 20px; 
             animation: slideDown 0.8s ease-out;
             flex-shrink: 0;
+            gap: 8px;
         }
 
         .search-bar {
             width: 100%;
-            max-width: 600px;
+            max-width: 520px;
             padding: 15px 25px;
             font-size: 18px;
             background-color: #1e1e1e;
@@ -241,7 +242,7 @@
             background-color: #121212;
         }
 
-        /* --- Image Grid Styles --- */
+        /* --- Image Grid / Apps List Styles --- */
         .grid-container {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -253,10 +254,6 @@
             padding: 20px; 
         }
 
-        .grid-container::-webkit-scrollbar { width: 8px; }
-        .grid-container::-webkit-scrollbar-track { background: #1a1a1a; border-radius: 10px; margin-top: 20px; margin-bottom: 20px; }
-        .grid-container::-webkit-scrollbar-thumb { background: #bf00ff; border-radius: 10px; }
-
         .grid-item {
             position: relative;
             border-radius: 20px;
@@ -266,6 +263,9 @@
             animation: fadeIn 1s ease-out backwards;
             background-color: #000;
             height: 200px; 
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .grid-item img {
@@ -311,12 +311,19 @@
             transform: translate(-50%, -50%) scale(1);
         }
 
-        .grid-item:nth-child(1) { animation-delay: 0.1s; }
-        .grid-item:nth-child(2) { animation-delay: 0.2s; }
-        .grid-item:nth-child(3) { animation-delay: 0.3s; }
-        .grid-item:nth-child(4) { animation-delay: 0.4s; }
-        .grid-item:nth-child(5) { animation-delay: 0.5s; }
-        .grid-item:nth-child(6) { animation-delay: 0.6s; }
+        .app-card { padding: 12px; display:flex; flex-direction:column; gap:8px; align-items:flex-start; justify-content:flex-start; }
+        .app-card .title { font-size:18px; color:#fff; }
+        .app-card .meta { font-size:12px; color:#bbb; }
+        .app-actions { margin-left:auto; display:flex; gap:8px; }
+        .small-btn { background:#222; color:#fff; border:1px solid #333; padding:6px 10px; border-radius:8px; cursor:pointer; }
+
+        /* Modal */
+        .modal { position: fixed; left:50%; top:50%; transform: translate(-50%,-50%); background:#121212; border:1px solid #333; padding:16px; border-radius:10px; box-shadow: 0 10px 30px rgba(0,0,0,0.6); z-index:2000; }
+        .modal[hidden]{display:none}
+        .modal input, .modal select { width: 100%; padding:8px; margin:8px 0; border-radius:8px; border:1px solid #222; background:#0f0f0f; color:#fff }
+
+        /* Remove button for custom items */
+        .remove-custom { position:absolute; right:10px; top:10px; background:rgba(0,0,0,0.6); border:none; color:#fff; width:28px; height:28px; border-radius:6px; cursor:pointer }
 
         @keyframes slideDown {
             from { opacity: 0; transform: translateY(-30px); }
@@ -377,119 +384,190 @@
 
         <div class="search-container" id="searchContainer">
             <input type="text" id="searchBar" class="search-bar" placeholder="Type a link name to filter...">
+            <button id="addBtn" class="small-btn">Add</button>
         </div>
 
-        <div class="grid-container" id="gridContainer">
-            <div class="grid-item interactive-link" data-name="games gaming" data-url="https://en.wikipedia.org/wiki/Video_game">
-                <img src="https://via.placeholder.com/400x300/1a1a1a/bf00ff?text=Games" alt="Games">
-                <div class="center-text">AWESOME GAMES</div>
-            </div>
-            
-            <div class="grid-item interactive-link" data-name="music beats audio" data-url="https://en.wikipedia.org/wiki/Music">
-                <img src="https://via.placeholder.com/400x300/1a1a1a/bf00ff?text=Music" alt="Music">
-                <div class="center-text">SICK BEATS</div>
-            </div>
-            
-            <div class="grid-item interactive-link" data-name="videos movies youtube" data-url="https://en.wikipedia.org/wiki/Video">
-                <img src="https://via.placeholder.com/400x300/1a1a1a/bf00ff?text=Videos" alt="Videos">
-                <div class="center-text">COOL VIDEOS</div>
-            </div>
-            
-            <div class="grid-item interactive-link" data-name="art drawing design" data-url="https://en.wikipedia.org/wiki/Art">
-                <img src="https://via.placeholder.com/400x300/1a1a1a/bf00ff?text=Art" alt="Art">
-                <div class="center-text">DIGITAL ART</div>
-            </div>
-            
-            <div class="grid-item interactive-link" data-name="code coding programming" data-url="https://en.wikipedia.org/wiki/Computer_programming">
-                <img src="https://via.placeholder.com/400x300/1a1a1a/bf00ff?text=Code" alt="Code">
-                <div class="center-text">COMPLEX CODING PROJECTS</div>
-            </div>
-            
-            <div class="grid-item interactive-link" data-name="social chat friends" data-url="https://en.wikipedia.org/wiki/Social_media">
-                <img src="https://via.placeholder.com/400x300/1a1a1a/bf00ff?text=Social" alt="Social">
-                <div class="center-text">SOCIAL MEDIA</div>
-            </div>
+        <!-- Unified Apps section (replaces separate apps/games) -->
+        <div class="grid-container" id="gridContainer" aria-live="polite">
+            <!-- Items will be rendered here by JS -->
         </div>
+
+        <!-- Add modal -->
+        <div class="modal" id="addModal" hidden>
+            <h3 style="color:#fff">Add custom item</h3>
+            <form id="addForm">
+                <label style="color:#ccc">Name<input name="name" required></label>
+                <label style="color:#ccc">URL<input name="url" type="url" placeholder="https://example.com"></label>
+                <label style="color:#ccc">Type
+                    <select name="type">
+                        <option value="app">App</option>
+                        <option value="game">Game</option>
+                    </select>
+                </label>
+                <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:8px">
+                    <button type="submit" class="small-btn">Add</button>
+                    <button type="button" id="cancelAdd" class="small-btn">Cancel</button>
+                </div>
+            </form>
+        </div>
+
     </main>
 
     <script>
-        const searchInput = document.getElementById('searchBar');
-        const gridItems = document.querySelectorAll('.grid-item');
+        // New unified apps/games functionality
+        (function(){
+            const STORAGE_KEY = 'unbreaking_custom_apps_v1';
 
-        searchInput.addEventListener('input', function(event) {
-            const searchText = event.target.value.toLowerCase();
-            gridItems.forEach(function(item) {
-                const itemName = item.getAttribute('data-name').toLowerCase();
-                if (itemName.includes(searchText)) {
-                    item.style.display = 'block';
+            // Built-in items (from the previous static grid)
+            const builtIns = [
+                { id: 'g-1', name: 'AWESOME GAMES', url: 'https://en.wikipedia.org/wiki/Video_game', type: 'game', img: 'https://via.placeholder.com/400x300/1a1a1a/bf00ff?text=Games' },
+                { id: 'a-1', name: 'SICK BEATS', url: 'https://en.wikipedia.org/wiki/Music', type: 'app', img: 'https://via.placeholder.com/400x300/1a1a1a/bf00ff?text=Music' },
+                { id: 'a-2', name: 'COOL VIDEOS', url: 'https://en.wikipedia.org/wiki/Video', type: 'app', img: 'https://via.placeholder.com/400x300/1a1a1a/bf00ff?text=Videos' },
+                { id: 'a-3', name: 'DIGITAL ART', url: 'https://en.wikipedia.org/wiki/Art', type: 'app', img: 'https://via.placeholder.com/400x300/1a1a1a/bf00ff?text=Art' },
+                { id: 'a-4', name: 'COMPLEX CODING PROJECTS', url: 'https://en.wikipedia.org/wiki/Computer_programming', type: 'app', img: 'https://via.placeholder.com/400x300/1a1a1a/bf00ff?text=Code' },
+                { id: 'a-5', name: 'SOCIAL MEDIA', url: 'https://en.wikipedia.org/wiki/Social_media', type: 'app', img: 'https://via.placeholder.com/400x300/1a1a1a/bf00ff?text=Social' }
+            ];
+
+            function loadCustom(){
+                try{ const raw = localStorage.getItem(STORAGE_KEY); return raw? JSON.parse(raw):[] }catch(e){ return [] }
+            }
+            function saveCustom(arr){ localStorage.setItem(STORAGE_KEY, JSON.stringify(arr)) }
+
+            let customItems = loadCustom();
+            let items = [...builtIns, ...customItems];
+
+            // DOM
+            const gridContainer = document.getElementById('gridContainer');
+            const searchBar = document.getElementById('searchBar');
+            const addBtn = document.getElementById('addBtn');
+            const addModal = document.getElementById('addModal');
+            const addForm = document.getElementById('addForm');
+            const cancelAdd = document.getElementById('cancelAdd');
+            const contentFrame = document.getElementById('contentFrame');
+            const searchContainer = document.getElementById('searchContainer');
+            const customPage = document.getElementById('customPage');
+
+            function makeId(){ return 'c-'+Date.now()+'-'+Math.floor(Math.random()*1000) }
+
+            function render(q){
+                const query = (q||'').toLowerCase().trim();
+                gridContainer.innerHTML = '';
+                const filtered = items.filter(it => {
+                    if(!query) return true;
+                    return (it.name||'').toLowerCase().includes(query) || (it.type||'').includes(query);
+                });
+
+                if(filtered.length === 0){ gridContainer.innerHTML = '<div style="color:#ccc; text-align:center; width:100%">No results</div>'; return }
+
+                for(const it of filtered){
+                    const el = document.createElement('div');
+                    el.className = 'grid-item interactive-link';
+                    el.setAttribute('data-name', it.name + ' ' + it.type);
+                    el.setAttribute('data-url', it.url);
+
+                    const img = document.createElement('img'); img.src = it.img || 'https://via.placeholder.com/400x300/1a1a1a/bf00ff?text=Item'; img.alt = it.name;
+                    const center = document.createElement('div'); center.className = 'center-text'; center.textContent = it.name;
+
+                    el.appendChild(img);
+                    el.appendChild(center);
+
+                    // if custom, add remove button
+                    if(it.source === 'custom'){
+                        const rm = document.createElement('button'); rm.className = 'remove-custom'; rm.title = 'Remove'; rm.textContent = '×';
+                        rm.addEventListener('click', (ev)=>{ ev.stopPropagation(); removeCustom(it.id); });
+                        el.appendChild(rm);
+                    }
+
+                    // click behavior
+                    el.addEventListener('click', function(){
+                        const targetUrl = this.getAttribute('data-url');
+                        // hide other UI
+                        gridContainer.style.display = 'none';
+                        searchContainer.style.display = 'none';
+                        customPage.style.display = 'none';
+                        contentFrame.style.display = 'none';
+
+                        if(targetUrl === 'home'){
+                            contentFrame.src = '';
+                            gridContainer.style.display = 'grid';
+                            searchContainer.style.display = 'flex';
+                        } else if(targetUrl === 'special-page'){
+                            contentFrame.src = '';
+                            customPage.style.display = 'flex';
+                        } else {
+                            contentFrame.src = targetUrl;
+                            contentFrame.style.display = 'block';
+                        }
+                    });
+
+                    gridContainer.appendChild(el);
+                }
+            }
+
+            function addCustom(item){
+                const newItem = { id: makeId(), name: item.name, url: item.url||'#', type: item.type||'app', source: 'custom', img: 'https://via.placeholder.com/400x300/1a1a1a/bf00ff?text=Custom' };
+                customItems.push(newItem);
+                saveCustom(customItems);
+                items = [...builtIns, ...customItems];
+                render(searchBar.value);
+            }
+
+            function removeCustom(id){
+                customItems = customItems.filter(i=>i.id !== id);
+                saveCustom(customItems);
+                items = [...builtIns, ...customItems];
+                render(searchBar.value);
+            }
+
+            // Events
+            searchBar.addEventListener('input', ()=> render(searchBar.value));
+            addBtn.addEventListener('click', ()=>{ addModal.hidden = false; addForm.name.focus(); });
+            cancelAdd.addEventListener('click', ()=>{ addModal.hidden = true; addForm.reset(); });
+            addForm.addEventListener('submit', (e)=>{
+                e.preventDefault();
+                const fd = new FormData(addForm);
+                const name = (fd.get('name')||'').toString().trim();
+                const url = (fd.get('url')||'').toString().trim();
+                const type = (fd.get('type')||'app').toString();
+                if(!name) return alert('Please enter a name.');
+                addCustom({ name, url, type });
+                addForm.reset(); addModal.hidden = true;
+            });
+
+            // Initialize
+            document.addEventListener('DOMContentLoaded', ()=> render());
+            if(document.readyState === 'complete' || document.readyState === 'interactive') render();
+
+            // Expose minimal API
+            window.UnbreakingApps = { addCustom, removeCustom, list: ()=> items.slice(), clearCustom: ()=>{ customItems = []; saveCustom(customItems); items = [...builtIns]; render(); } }
+
+            // Keep other existing sidebar buttons behavior
+            document.getElementById('googleSidebarBtn').addEventListener('click', () => { window.open('https://google.com', '_blank'); });
+            document.getElementById('googleInternalBtn')?.addEventListener('click', () => { window.open('https://google.com', '_blank'); });
+            const btnFullscreen = document.getElementById('btnFullscreen');
+            btnFullscreen.addEventListener('click', () => {
+                if (contentFrame.style.display === 'block') {
+                    if (contentFrame.requestFullscreen) {
+                        contentFrame.requestFullscreen();
+                    } else if (contentFrame.webkitRequestFullscreen) {
+                        contentFrame.webkitRequestFullscreen();
+                    } else if (contentFrame.msRequestFullscreen) {
+                        contentFrame.msRequestFullscreen();
+                    }
                 } else {
-                    item.style.display = 'none';
+                    alert("Please open an external link in the iframe before making it fullscreen!");
                 }
             });
-        });
-
-        const interactiveLinks = document.querySelectorAll('.interactive-link');
-        const contentFrame = document.getElementById('contentFrame');
-        const gridContainer = document.getElementById('gridContainer');
-        const searchContainer = document.getElementById('searchContainer');
-        const customPage = document.getElementById('customPage');
-
-        interactiveLinks.forEach(link => {
-            link.addEventListener('click', function() {
-                const targetUrl = this.getAttribute('data-url');
-
-                contentFrame.style.display = 'none';
-                gridContainer.style.display = 'none';
-                searchContainer.style.display = 'none';
-                customPage.style.display = 'none';
-
-                if (targetUrl === 'home') {
-                    contentFrame.src = ''; 
-                    gridContainer.style.display = 'grid';
-                    searchContainer.style.display = 'flex';
-                } else if (targetUrl === 'special-page') {
-                    contentFrame.src = ''; 
-                    customPage.style.display = 'flex';
+            const btnRefresh = document.getElementById('btnRefresh');
+            btnRefresh.addEventListener('click', () => {
+                if (contentFrame.style.display === 'block' && contentFrame.src !== '') {
+                    const currentUrl = contentFrame.src;
+                    contentFrame.src = currentUrl;
                 } else {
-                    contentFrame.src = targetUrl;
-                    contentFrame.style.display = 'block';
+                    alert("No external page is currently open to refresh.");
                 }
             });
-        });
-
-        /* --- Javascript Triggers for Hidden URL Links --- */
-        document.getElementById('googleSidebarBtn').addEventListener('click', () => {
-            window.open('https://google.com', '_blank');
-        });
-
-        document.getElementById('googleInternalBtn').addEventListener('click', () => {
-            window.open('https://google.com', '_blank');
-        });
-
-        const btnFullscreen = document.getElementById('btnFullscreen');
-        btnFullscreen.addEventListener('click', () => {
-            if (contentFrame.style.display === 'block') {
-                if (contentFrame.requestFullscreen) {
-                    contentFrame.requestFullscreen();
-                } else if (contentFrame.webkitRequestFullscreen) {
-                    contentFrame.webkitRequestFullscreen();
-                } else if (contentFrame.msRequestFullscreen) {
-                    contentFrame.msRequestFullscreen();
-                }
-            } else {
-                alert("Please open an external link in the iframe before making it fullscreen!");
-            }
-        });
-
-        const btnRefresh = document.getElementById('btnRefresh');
-        btnRefresh.addEventListener('click', () => {
-            if (contentFrame.style.display === 'block' && contentFrame.src !== '') {
-                const currentUrl = contentFrame.src;
-                contentFrame.src = currentUrl;
-            } else {
-                alert("No external page is currently open to refresh.");
-            }
-        });
+        })();
     </script>
 </body>
 </html>
