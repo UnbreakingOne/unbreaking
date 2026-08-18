@@ -99,8 +99,8 @@
             <span>Proxy</span>
         </a>
 
-        <!-- Unified Apps entry in sidebar still points to showApps() -->
-        <a class="nav-item" onclick="showApps()">
+        <!-- Combine Apps/Games: Apps sidebar opens gamesContent which now contains both games and apps -->
+        <a class="nav-item" onclick="showGames()">
             <img src="/images/games.png" alt="Apps (games icon)">
             <span>Apps</span>
         </a>
@@ -280,53 +280,277 @@
 
         </div>
 
-        <!-- Unified APPS (replaces separate GAMES/APPS sections) -->
+        <!-- GAMES (now serves as unified Apps view) -->
 
-        <div id="appsContent">
+        <div id="gamesContent">
 
-            <div class="gamesTopBar" style="display:flex; align-items:center; gap:12px;">
-                <img src="/images/games.png" alt="Games icon" style="width:36px; height:36px;">
-                <h2 style="color:#fff; margin:0">Apps</h2>
+            <div class="gamesTopBar">
+
                 <input type="text"
                     class="searchBar"
-                    id="appsSearchBar"
-                    placeholder="Search apps & games..."
-                    style="margin-left:8px; flex:1; max-width:600px;">
+                    id="gamesSearchBar"
+                    placeholder="Search for a game...">
 
-                <button id="addItemBtn" type="button" style="margin-left:8px;">Add</button>
+                <button id="addGameBtn" type="button">Add</button>
+
             </div>
 
-            <!-- Add panel modal (hidden by default) -->
-            <div id="addItemPanel" style="display:none; margin-top:12px;">
-                <h3>Add custom item</h3>
-                <form id="addItemForm">
+            <div id="addGamePanel">
+
+                <h3>Add a custom game</h3>
+
+                <form id="addGameForm">
+
                     <div class="addGameField">
-                        <label for="addItemName">Name</label>
-                        <input id="addItemName" name="name" type="text" maxlength="120" required placeholder="Example: My Cool App">
+                        <label for="addGameName">Name</label>
+
+                        <input id="addGameName"
+                            type="text"
+                            maxlength="120"
+                            required
+                            placeholder="Example: My Cool Game">
                     </div>
 
                     <div class="addGameField">
-                        <label for="addItemType">Type</label>
-                        <select id="addItemType" name="type">
-                            <option value="app">App</option>
-                            <option value="game">Game</option>
+                        <label for="addGameType">Type</label>
+
+                        <select id="addGameType">
+                            <option value="url">URL</option>
+                            <option value="html">HTML</option>
                         </select>
                     </div>
 
-                    <div class="addGameField" id="addItemUrlWrap">
-                        <label for="addItemUrl">URL / Target</label>
-                        <input id="addItemUrl" name="url" type="text" placeholder="Example: /app/sandbox or /search/https://example.com">
+                    <div class="addGameField" id="addGameUrlWrap">
+                        <label for="addGameUrl">URL / Search text</label>
+
+                        <input id="addGameUrl"
+                            type="text"
+                            placeholder="Example: https://example.com">
                     </div>
 
-                    <div style="display:flex; gap:8px; margin-top:8px;">
-                        <button type="submit" class="authBtn">Save</button>
-                        <button type="button" id="cancelAddItem" class="authBtn" style="background:#444">Cancel</button>
+                    <div class="addGameField"
+                        id="addGameHtmlWrap"
+                        style="display:none">
+
+                        <label for="addGameHtml">HTML code</label>
+
+                        <textarea id="addGameHtml"
+                            placeholder="Paste full HTML here"></textarea>
+
+                        <p id="htmlHelpText">
+                            <a href="https://docs.google.com/document/d/1_FmH3BlSBQI7FGgAQL59-ZPe8eCxs35wel6JUyVaG8Q/edit?tab=t.0"
+                                target="_blank"
+                                rel="noopener noreferrer">
+
+                                Go on this doc and choose a game and click on it then copy all of the code and paste it into here
+
+                            </a>
+                        </p>
+
                     </div>
+
+                    <div class="addGameField">
+                        <label for="addGameIcon">Icon image</label>
+                        <input id="addGameIcon" type="file" accept="image/*">
+                    </div>
+
+                    <div class="addGameActions">
+                        <button type="button" id="cancelAddGameBtn">
+                            Cancel
+                        </button>
+
+                        <button type="submit">
+                            Save Game
+                        </button>
+                    </div>
+
                 </form>
+
             </div>
 
-            <div class="linksContainer" id="appsLinksContainer" style="margin-top:12px; display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:12px;">
-                <!-- Items will be rendered here by JS -->
+            <div class="linksContainer" id="gamesLinksContainer">
+
+                <div class="gameCard" onclick="loadGame('/game/amongus')">
+                    <img src="/images/amongus.png" alt="Among Us">
+                    <div class="gameTitle">Among Us</div>
+                </div>
+
+                <div class="gameCard" onclick="loadGame('/search/https://aw2-tau.vercel.app')">
+                    <img src="/images/awesometanks2.png" alt="Awesome Tanks 2">
+                    <div class="gameTitle">Awesome Tanks 2</div>
+                </div>
+
+                <div class="gameCard" onclick="loadGame('/search/https://copter.io')">
+                    <img src="/images/copterio.png" alt="Copter.io">
+                    <div class="gameTitle">Copter.io</div>
+                </div>
+
+                <div class="gameCard" onclick="loadGame('/game/driftboss')">
+                    <img src="/images/driftboss.png" alt="Drift Boss">
+                    <div class="gameTitle">Drift Boss</div>
+                </div>
+
+                <div class="gameCard" onclick="loadGame('/game/eaglercraft')">
+                    <img src="/images/eaglercraft.png" alt="Eaglercraft">
+                    <div class="gameTitle">Eaglercraft</div>
+                </div>
+
+                <div class="gameCard" onclick="loadGame('/search/https://hexanaut.io')">
+                    <img src="/images/hexanautio.png" alt="Hexanaut.io">
+                    <div class="gameTitle">Hexanaut.io</div>
+                </div>
+
+                <div class="gameCard" onclick="loadGame('/game/geometrydash')">
+                    <img src="/images/geometrydash.png" alt="Geometry Dash">
+                    <div class="gameTitle">Geometry Dash</div>
+                </div>
+
+                <div class="gameCard" onclick="loadGame('/game/grindcraft')">
+                    <img src="/images/grindcraft.png" alt="Grindcraft">
+                    <div class="gameTitle">Grindcraft</div>
+                </div>
+
+                <div class="gameCard" onclick="loadGame('/game/hollowknight')">
+                    <img src="/images/hollowknight.png" alt="Hollow Knight">
+                    <div class="gameTitle">Hollow Knight</div>
+                </div>
+
+                <div class="gameCard" onclick="loadGame('/game/monkeymart')">
+                    <img src="/images/monkeymart.png" alt="Monkey Mart">
+                    <div class="gameTitle">Monkey Mart</div>
+                </div>
+
+                <div class="gameCard" onclick="loadGame('/game/paperminecraft')">
+                    <img src="/images/paperminecraft.png" alt="Paper Minecraft">
+                    <div class="gameTitle">Paper Minecraft</div>
+                </div>
+
+                <div class="gameCard" onclick="loadGame('/game/ragdollarchers')">
+                    <img src="/images/ragdollarchers.png" alt="Ragdoll Archers">
+                    <div class="gameTitle">Ragdoll Archers</div>
+                </div>
+
+                <div class="gameCard" onclick="loadGame('/game/ragdollhit')">
+                    <img src="/images/ragdollhit.png" alt="Ragdoll Hit">
+                    <div class="gameTitle">Ragdoll Hit</div>
+                </div>
+
+                <div class="gameCard" onclick="loadGame('/game/rocketleague')">
+                    <img src="/images/rocketleague.png" alt="Rocket League">
+                    <div class="gameTitle">Rocket League</div>
+                </div>
+
+                <div class="gameCard" onclick="loadGame('/game/run3')">
+                    <img src="/images/run3.png" alt="Run 3">
+                    <div class="gameTitle">Run 3</div>
+                </div>
+
+                <div class="gameCard" onclick="loadGame('/game/smashcarts')">
+                    <img src="/images/smashcarts.png" alt="Smash Carts">
+                    <div class="gameTitle">Smash Carts</div>
+                </div>
+
+                <div class="gameCard" onclick="loadGame('/game/snowrider')">
+                    <img src="/images/snowrider.png" alt="Snow Rider 3D">
+                    <div class="gameTitle">Snow Rider 3D</div>
+                </div>
+
+                <div class="gameCard" onclick="loadGame('/game/soccerrandom')">
+                    <img src="/images/soccerrandom.png" alt="Soccer Random">
+                    <div class="gameTitle">Soccer Random</div>
+                </div>
+
+                <div class="gameCard" onclick="loadGame('/game/survivalrace')">
+                    <img src="/images/survivalrace.png" alt="Survival Race">
+                    <div class="gameTitle">Survival Race</div>
+                </div>
+
+                <div class="gameCard" onclick="loadGame('/game/survivor')">
+                    <img src="/images/survivor.png" alt="Survivor Game">
+                    <div class="gameTitle">Survivor Game</div>
+                </div>
+
+                <div class="gameCard" onclick="loadGame('/game/survivorio')">
+                    <img src="/images/survivorio.png" alt="Survivor Io">
+                    <div class="gameTitle">Survivor Io</div>
+                </div>
+
+                <div class="gameCard" onclick="loadGame('/game/thefinalearth2')">
+                    <img src="/images/thefinalearth2.png" alt="The Final Earth 2">
+                    <div class="gameTitle">The Final Earth 2</div>
+                </div>
+
+                <div class="gameCard" onclick="loadGame('/game/tombofthemask')">
+                    <img src="/images/tombofthemask.png" alt="Tomb of the Mask">
+                    <div class="gameTitle">Tomb of the Mask</div>
+                </div>
+
+                <div class="gameCard" onclick="loadGame('/game/yohohoio')">
+                    <img src="/images/yohohoio.png" alt="Yohoho Io">
+                    <div class="gameTitle">Yohoho Io</div>
+                </div>
+
+                <!-- APPS moved here to combine with games -->
+                <div class="gameCard" onclick="loadGame('/app/bgremover')">
+                    <img src="/images/bgremover.png" alt="Background Remover">
+                    <div class="gameTitle">Background Remover</div>
+                </div>
+
+                <div class="gameCard" onclick="loadGame('/search/https://codebeautify.org/htmlviewer')">
+                    <img src="/images/codeedit.png" alt="Code Editor">
+                    <div class="gameTitle">Code Editor</div>
+                </div>
+
+                <div class="gameCard" onclick="loadGame('/search/https://crazygames.com')">
+                    <img src="/images/crazygames.png" alt="Crazy Games" onerror="this.onerror=null;this.src='/images/games.png';">
+                    <div class="gameTitle">Crazy Games</div>
+                </div>
+
+                <div class="gameCard" onclick="loadGame('/app/elements')">
+                    <img src="/images/elements.png" alt="Elements">
+                    <div class="gameTitle">Elements</div>
+                </div>
+
+                <div class="gameCard" onclick="loadGame('/app/fileconverter')">
+                    <img src="/images/fileconverter.png" alt="File Converter">
+                    <div class="gameTitle">File Converter</div>
+                </div>
+
+                <div class="gameCard" onclick="loadGame('/search/https://freedns.afraid.org')">
+                    <img src="/images/freedns.png" alt="Free DNS">
+                    <div class="gameTitle">Free DNS</div>
+                </div>
+
+                <div class="gameCard" onclick="loadGame('/search/https://iogames.space')">
+                    <img src="/images/iogames.png" alt="Io Games" onerror="this.onerror=null;this.src='/images/copterio.png';">
+                    <div class="gameTitle">Io Games</div>
+                </div>
+
+                <div class="gameCard" onclick="loadGame('/search/https://gim.villainsrule.xyz')">
+                    <img src="/images/gimkithacks.png" alt="Gimkit with Hacks">
+                    <div class="gameTitle">Gimkit with Hacks</div>
+                </div>
+
+                <div class="gameCard" onclick="loadGame('/search/https://tcgplayer.com')">
+                    <img src="/images/tcgplayer.png" alt="TCG Player" onerror="this.onerror=null;this.src='/images/mtglife.png';">
+                    <div class="gameTitle">TCG Player</div>
+                </div>
+
+                <div class="gameCard" onclick="loadGame('/app/sandbox')">
+                    <img src="/images/sandbox.png" alt="Sandbox">
+                    <div class="gameTitle">Sandbox</div>
+                </div>
+
+                <div class="gameCard" onclick="loadGame('/search/https://ssp-link-viewer.vercel.app')">
+                    <img src="/images/webcrawler.png" alt="Link Viewer">
+                    <div class="gameTitle">Link Viewer</div>
+                </div>
+
+                <div class="gameCard" onclick="loadGame('/search/https://youtube.com')">
+                    <img src="/images/youtube.png" alt="Youtube" onerror="this.onerror=null;this.src='/images/webcrawler.png';">
+                    <div class="gameTitle">Youtube</div>
+                </div>
+
             </div>
 
         </div>
@@ -417,127 +641,35 @@
     <script src="/js.js"></script>
 
     <script>
-        // Populate the unified Apps section by combining the previous static lists
+        // Ensure Games view is used for Apps navigation and keep existing add-game system untouched.
+        // Keep a small bit of code to map the apps search to the games search input so users can filter both.
         (function(){
-            const STORAGE_KEY = 'tempest_custom_items_v1';
-
-            // Built-in items: copy of previous game/app entries
-            const builtIns = [
-                // Games (copied from original gamesContent)
-                { id: 'g-amongus', name: 'Among Us', url: '/game/amongus', type: 'game', img: '/images/amongus.png' },
-                { id: 'g-aw2', name: 'Awesome Tanks 2', url: '/search/https://aw2-tau.vercel.app', type: 'game', img: '/images/awesometanks2.png' },
-                { id: 'g-copterio', name: 'Copter.io', url: '/search/https://copter.io', type: 'game', img: '/images/copterio.png' },
-                { id: 'g-driftboss', name: 'Drift Boss', url: '/game/driftboss', type: 'game', img: '/images/driftboss.png' },
-                { id: 'g-eaglercraft', name: 'Eaglercraft', url: '/game/eaglercraft', type: 'game', img: '/images/eaglercraft.png' },
-                { id: 'g-hexanaut', name: 'Hexanaut.io', url: '/search/https://hexanaut.io', type: 'game', img: '/images/hexanautio.png' },
-                { id: 'g-geometrydash', name: 'Geometry Dash', url: '/game/geometrydash', type: 'game', img: '/images/geometrydash.png' },
-                { id: 'g-grindcraft', name: 'Grindcraft', url: '/game/grindcraft', type: 'game', img: '/images/grindcraft.png' },
-                { id: 'g-hollowknight', name: 'Hollow Knight', url: '/game/hollowknight', type: 'game', img: '/images/hollowknight.png' },
-                { id: 'g-monkeymart', name: 'Monkey Mart', url: '/game/monkeymart', type: 'game', img: '/images/monkeymart.png' },
-                { id: 'g-paperminecraft', name: 'Paper Minecraft', url: '/game/paperminecraft', type: 'game', img: '/images/paperminecraft.png' },
-                { id: 'g-ragdollarchers', name: 'Ragdoll Archers', url: '/game/ragdollarchers', type: 'game', img: '/images/ragdollarchers.png' },
-                { id: 'g-ragdollhit', name: 'Ragdoll Hit', url: '/game/ragdollhit', type: 'game', img: '/images/ragdollhit.png' },
-                { id: 'g-rocketleague', name: 'Rocket League', url: '/game/rocketleague', type: 'game', img: '/images/rocketleague.png' },
-                { id: 'g-run3', name: 'Run 3', url: '/game/run3', type: 'game', img: '/images/run3.png' },
-                { id: 'g-smashcarts', name: 'Smash Carts', url: '/game/smashcarts', type: 'game', img: '/images/smashcarts.png' },
-                { id: 'g-snowrider', name: 'Snow Rider 3D', url: '/game/snowrider', type: 'game', img: '/images/snowrider.png' },
-                { id: 'g-soccerrandom', name: 'Soccer Random', url: '/game/soccerrandom', type: 'game', img: '/images/soccerrandom.png' },
-                { id: 'g-survivalrace', name: 'Survival Race', url: '/game/survivalrace', type: 'game', img: '/images/survivalrace.png' },
-                { id: 'g-survivor', name: 'Survivor Game', url: '/game/survivor', type: 'game', img: '/images/survivor.png' },
-                { id: 'g-survivorio', name: 'Survivor Io', url: '/game/survivorio', type: 'game', img: '/images/survivorio.png' },
-                { id: 'g-finalearth2', name: 'The Final Earth 2', url: '/game/thefinalearth2', type: 'game', img: '/images/thefinalearth2.png' },
-                { id: 'g-tombofthemask', name: 'Tomb of the Mask', url: '/game/tombofthemask', type: 'game', img: '/images/tombofthemask.png' },
-                { id: 'g-yohohoio', name: 'Yohoho Io', url: '/game/yohohoio', type: 'game', img: '/images/yohohoio.png' },
-                // Apps (copied from original appsContent)
-                { id: 'a-bgremover', name: 'Background Remover', url: '/app/bgremover', type: 'app', img: '/images/bgremover.png' },
-                { id: 'a-codeeditor', name: 'Code Editor', url: '/search/https://codebeautify.org/htmlviewer', type: 'app', img: '/images/codeedit.png' },
-                { id: 'a-crazygames', name: 'Crazy Games', url: '/search/https://crazygames.com', type: 'app', img: '/images/crazygames.png' },
-                { id: 'a-elements', name: 'Elements', url: '/app/elements', type: 'app', img: '/images/elements.png' },
-                { id: 'a-fileconverter', name: 'File Converter', url: '/app/fileconverter', type: 'app', img: '/images/fileconverter.png' },
-                { id: 'a-freedns', name: 'Free DNS', url: '/search/https://freedns.afraid.org', type: 'app', img: '/images/freedns.png' },
-                { id: 'a-iogames', name: 'Io Games', url: '/search/https://iogames.space', type: 'app', img: '/images/iogames.png' },
-                { id: 'a-gimkit', name: 'Gimkit with Hacks', url: '/search/https://gim.villainsrule.xyz', type: 'app', img: '/images/gimkithacks.png' },
-                { id: 'a-tcg', name: 'TCG Player', url: '/search/https://tcgplayer.com', type: 'app', img: '/images/tcgplayer.png' },
-                { id: 'a-sandbox', name: 'Sandbox', url: '/app/sandbox', type: 'app', img: '/images/sandbox.png' },
-                { id: 'a-linkviewer', name: 'Link Viewer', url: '/search/https://ssp-link-viewer.vercel.app', type: 'app', img: '/images/webcrawler.png' },
-                { id: 'a-youtube', name: 'Youtube', url: '/search/https://youtube.com', type: 'app', img: '/images/youtube.png' }
-            ];
-
-            function loadCustom(){ try{ const raw = localStorage.getItem(STORAGE_KEY); return raw? JSON.parse(raw):[] }catch(e){ return [] } }
-            function saveCustom(arr){ localStorage.setItem(STORAGE_KEY, JSON.stringify(arr)); }
-
-            let customItems = loadCustom();
-            let items = [...builtIns, ...customItems];
-
-            const container = document.getElementById('appsLinksContainer');
-            const search = document.getElementById('appsSearchBar');
-            const addBtn = document.getElementById('addItemBtn');
-            const addPanel = document.getElementById('addItemPanel');
-            const addForm = document.getElementById('addItemForm');
-            const cancelAdd = document.getElementById('cancelAddItem');
-            const contentFrame = document.getElementById('contentFrame');
-
-            function makeId(){ return 'c-'+Date.now()+'-'+Math.floor(Math.random()*1000) }
-
-            function render(q){
-                const query = (q||'').toLowerCase().trim();
-                container.innerHTML = '';
-                const filtered = items.filter(it=>{ if(!query) return true; return (it.name||'').toLowerCase().includes(query) || (it.type||'').includes(query); });
-                if(filtered.length === 0){ container.innerHTML = '<div style="color:#ccc; grid-column:1/-1; text-align:center">No results</div>'; return }
-                for(const it of filtered){
-                    const card = document.createElement('div');
-                    card.className = 'gameCard';
-                    card.style.cursor = 'pointer';
-                    card.style.display = 'flex';
-                    card.style.flexDirection = 'column';
-                    card.style.alignItems = 'center';
-                    card.style.background = '#0f0f10';
-                    card.style.borderRadius = '10px';
-                    card.style.padding = '8px';
-
-                    const img = document.createElement('img'); img.src = it.img || '/images/games.png'; img.alt = it.name; img.style.width='100%'; img.style.height='80px'; img.style.objectFit='cover'; img.onerror = function(){ this.onerror=null; this.src='/images/games.png'; }
-                    const title = document.createElement('div'); title.className = 'gameTitle'; title.textContent = it.name; title.style.marginTop='8px'; title.style.textAlign='center'; title.style.color='#fff';
-
-                    card.appendChild(img);
-                    card.appendChild(title);
-
-                    if(it.source === 'custom'){
-                        const rm = document.createElement('button'); rm.textContent='×'; rm.title='Remove'; rm.style.position='absolute'; rm.style.marginLeft='-28px'; rm.style.marginTop='6px'; rm.style.background='transparent'; rm.style.color='#fff'; rm.style.border='none'; rm.style.fontSize='18px'; rm.style.cursor='pointer';
-                        rm.addEventListener('click', (e)=>{ e.stopPropagation(); removeCustom(it.id); });
-                        card.style.position='relative';
-                        card.appendChild(rm);
-                    }
-
-                    card.addEventListener('click', ()=>{
-                        // Use existing loadGame function from js.js
-                        if(typeof loadGame === 'function'){
-                            loadGame(it.url);
-                        } else {
-                            // fallback: open in iframe
-                            contentFrame.src = it.url;
-                            contentFrame.style.display = 'block';
-                        }
+            // If the page has both games and apps originally, we've moved apps into gamesLinksContainer above.
+            // Wire a search so the single input (gamesSearchBar) filters the combined list.
+            const gamesSearch = document.getElementById('gamesSearchBar');
+            const gamesLinks = document.getElementById('gamesLinksContainer');
+            if(gamesSearch && gamesLinks){
+                gamesSearch.addEventListener('input', function(){
+                    const q = this.value.toLowerCase().trim();
+                    const cards = gamesLinks.querySelectorAll('.gameCard');
+                    cards.forEach(card=>{
+                        const title = (card.querySelector('.gameTitle')?.textContent||'').toLowerCase();
+                        if(!q) card.style.display='flex';
+                        else if(title.includes(q)) card.style.display='flex';
+                        else card.style.display='none';
                     });
-
-                    container.appendChild(card);
-                }
+                });
             }
 
-            function addCustom(item){ const newItem = { id: makeId(), name: item.name, url: item.url||'#', type: item.type||'app', source: 'custom', img: '/images/games.png' }; customItems.push(newItem); saveCustom(customItems); items = [...builtIns, ...customItems]; render(search.value); }
-            function removeCustom(id){ customItems = customItems.filter(i=>i.id !== id); saveCustom(customItems); items = [...builtIns, ...customItems]; render(search.value); }
+            // Make sure the Apps sidebar button opens the games view (combined list)
+            // If your existing showApps function exists and is used elsewhere, this keeps it safe.
+            if(typeof window.showApps === 'function'){
+                // override showApps to call showGames if available
+                const origShowApps = window.showApps;
+                window.showApps = function(){ if(typeof window.showGames === 'function') return window.showGames(); return origShowApps(); };
+            }
 
-            // Events
-            search.addEventListener('input', ()=> render(search.value));
-            addBtn.addEventListener('click', ()=>{ addPanel.style.display = addPanel.style.display === 'none' ? 'block' : 'none'; document.getElementById('addItemName').focus(); });
-            cancelAdd.addEventListener('click', ()=>{ addPanel.style.display = 'none'; addForm.reset(); });
-            addForm.addEventListener('submit', (e)=>{ e.preventDefault(); const name = document.getElementById('addItemName').value.trim(); const url = document.getElementById('addItemUrl').value.trim(); const type = document.getElementById('addItemType').value; if(!name) return alert('Enter a name'); addCustom({ name, url, type }); addForm.reset(); addPanel.style.display='none'; });
-
-            // Init
-            document.addEventListener('DOMContentLoaded', ()=> render());
-            if(document.readyState === 'complete' || document.readyState === 'interactive') render();
-
-            // Expose API
-            window.TempestApps = { addCustom, removeCustom, list: ()=> items.slice(), clearCustom: ()=>{ customItems=[]; saveCustom(customItems); items=[...builtIns]; render(); } };
+            // If the sidebar Apps link still calls showApps, above handles it. If it calls showGames directly it's fine.
         })();
     </script>
 
