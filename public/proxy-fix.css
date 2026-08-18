@@ -1,25 +1,32 @@
-/* Proxy visibility fix: ensure the proxy iframe is visible and interactive when activated.
-   This overrides earlier conflicting rules and makes the iframe occupy the full viewport
-   with a high z-index so it won't remain hidden until fullscreen. */
+/* Proxy visibility fix — behave like other embedded frames (games/apps)
+   so the proxy iframe occupies the same area as #contentFrame when active
+   instead of covering the full viewport.
+*/
 
 #proxyContent.proxy-frame-active {
   display: block !important;
   position: fixed !important;
-  inset: 0 !important;
-  width: 100vw !important;
+  top: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  left: calc(var(--sidebar-width) + var(--sidebar-margin-left) + 20px) !important;
+  width: calc(100vw - var(--sidebar-width) - var(--sidebar-margin-left) - 40px) !important;
   height: 100vh !important;
   z-index: 2500 !important;
   pointer-events: auto !important;
   background: transparent !important;
 }
 
-#proxyContent.proxy-frame-active #proxyIframe,
-#proxyIframe.is-frame-active {
+#proxyIframe.is-frame-active,
+#proxyContent.proxy-frame-active #proxyIframe {
   position: fixed !important;
-  inset: 0 !important;
-  width: 100vw !important;
+  top: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  left: calc(var(--sidebar-width) + var(--sidebar-margin-left) + 20px) !important;
+  width: calc(100vw - var(--sidebar-width) - var(--sidebar-margin-left) - 40px) !important;
   height: 100vh !important;
-  z-index: 2600 !important;
+  z-index: 2500 !important;
   opacity: 1 !important;
   visibility: visible !important;
   pointer-events: auto !important;
