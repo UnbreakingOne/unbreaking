@@ -1,803 +1,666 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Unbreaking</title>
+    <title>Google</title>
 
-    <style>
-        @font-face {
-            font-family: 'Mojangles';
-            src: url('Mojangles.ttf') format('truetype');
-            font-weight: normal;
-            font-style: normal;
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Mojangles', 'Courier New', Courier, monospace;
-        }
-
-        body {
-            background-color: #0a0a0a;
-            color: #ffffff;
-            display: flex;
-            height: 100vh;
-            overflow: hidden;
-        }
-
-        .sidebar {
-            width: 90px;
-            background: linear-gradient(180deg, #121212 0%, #1a1a1a 100%);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 30px 0;
-            border-right: 1px solid #333;
-            box-shadow: 5px 0 15px rgba(0, 0, 0, 0.5);
-            z-index: 10;
-            flex-shrink: 0;
-        }
-
-        .sidebar-link {
-            margin-bottom: 20px;
-            display: block;
-            border-radius: 12px;
-            position: relative;
-            cursor: pointer;
-            text-decoration: none;
-        }
-
-        .sidebar-link img {
-            width: 50px;
-            height: 50px;
-            object-fit: cover;
-            border-radius: 12px;
-            transition: all 0.4s ease;
-            opacity: 0.7;
-            display: block;
-        }
-
-        .icon-symbol {
-            width: 50px;
-            height: 50px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 26px;
-            color: #ccc;
-            background-color: #1e1e1e;
-            border-radius: 12px;
-            transition: all 0.4s ease;
-            border: 1px solid transparent;
-        }
-
-        .sidebar-link .tooltip {
-            position: absolute;
-            left: 70px;
-            top: 50%;
-            transform: translateY(-50%);
-            background-color: #1e1e1e;
-            color: white;
-            padding: 8px 12px;
-            border-radius: 6px;
-            font-size: 14px;
-            white-space: nowrap;
-            opacity: 0;
-            pointer-events: none;
-            transition: all 0.3s ease;
-            border: 1px solid #bf00ff;
-            box-shadow: 0 0 10px rgba(191, 0, 255, 0.4);
-            z-index: 999;
-        }
-
-        .sidebar-link:hover img {
-            opacity: 1;
-            transform: scale(1.15) rotate(5deg);
-            box-shadow: 0 0 15px rgba(191, 0, 255, 0.8);
-        }
-
-        .sidebar-link:hover .icon-symbol {
-            transform: scale(1.15) rotate(5deg);
-            box-shadow: 0 0 15px rgba(191, 0, 255, 0.8);
-            border-color: #bf00ff;
-            color: #bf00ff;
-            text-shadow: 0 0 10px rgba(191, 0, 255, 0.8);
-        }
-
-        .sidebar-link:hover .tooltip {
-            opacity: 1;
-            left: 80px;
-        }
-
-        .sidebar-extra-img {
-            margin-top: auto;
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            opacity: 0.4;
-            margin-bottom: 10px;
-            pointer-events: none;
-        }
-
-        .sidebar-divider {
-            width: 50px;
-            height: 2px;
-            background-color: #333;
-            margin: 10px 0 25px 0;
-        }
-
-        .main-content {
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            padding: 30px 40px;
-            height: 100vh;
-            overflow: hidden;
-            z-index: 1;
-        }
-
-        .content-frame {
-            width: 100%;
-            height: 100%;
-            flex-grow: 1;
-            border: 2px solid #333;
-            border-radius: 20px;
-            display: none;
-            box-shadow: 0 0 30px rgba(191, 0, 255, 0.2);
-            background-color: #121212;
-            transition: all 0.5s ease;
-        }
-
-        .custom-page-container {
-            width: 100%;
-            height: 100%;
-            flex-grow: 1;
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            background-color: #121212;
-            border: 2px solid #333;
-            border-radius: 20px;
-            box-shadow: 0 0 30px rgba(191, 0, 255, 0.2);
-            animation: fadeIn 0.5s ease-out;
-            padding: 40px;
-        }
-
-        .custom-page-container h1 {
-            font-size: 3rem;
-            color: #bf00ff;
-            margin-bottom: 20px;
-            text-shadow: 0 0 15px rgba(191, 0, 255, 0.6);
-        }
-
-        .custom-page-container p {
-            font-size: 1.2rem;
-            color: #ccc;
-            margin-bottom: 40px;
-            max-width: 600px;
-            line-height: 1.6;
-        }
-
-        .real-link-btn {
-            padding: 15px 40px;
-            font-size: 1.2rem;
-            color: white;
-            background: transparent;
-            border: 2px solid #bf00ff;
-            border-radius: 30px;
-            text-decoration: none;
-            transition: all 0.3s ease;
-            box-shadow: 0 0 15px rgba(191, 0, 255, 0.4);
-            cursor: pointer;
-            display: inline-block;
-        }
-
-        .real-link-btn:hover {
-            background: #bf00ff;
-            box-shadow: 0 0 25px rgba(191, 0, 255, 0.8);
-            transform: scale(1.05);
-        }
-
-        .search-container {
-            display: flex;
-            justify-content: center;
-            margin-bottom: 20px;
-            animation: slideDown 0.8s ease-out;
-            flex-shrink: 0;
-        }
-
-        .search-bar {
-            width: 100%;
-            max-width: 600px;
-            padding: 15px 25px;
-            font-size: 18px;
-            background-color: #1e1e1e;
-            color: white;
-            border: 2px solid #333;
-            border-radius: 30px;
-            outline: none;
-            transition: all 0.3s ease;
-        }
-
-        .search-bar:focus {
-            border-color: #bf00ff;
-            box-shadow: 0 0 20px rgba(191, 0, 255, 0.6);
-            transform: scale(1.02);
-            background-color: #121212;
-        }
-
-        .grid-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 30px;
-            max-width: 1200px;
-            margin: 0 auto;
-            width: 100%;
-            overflow-y: auto;
-            padding: 20px;
-        }
-
-        .grid-container::-webkit-scrollbar {
-            width: 8px;
-        }
-
-        .grid-container::-webkit-scrollbar-track {
-            background: #1a1a1a;
-            border-radius: 10px;
-            margin-top: 20px;
-            margin-bottom: 20px;
-        }
-
-        .grid-container::-webkit-scrollbar-thumb {
-            background: #bf00ff;
-            border-radius: 10px;
-        }
-
-        .grid-item {
-            position: relative;
-            border-radius: 20px;
-            overflow: hidden;
-            cursor: pointer;
-            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            animation: fadeIn 1s ease-out backwards;
-            background-color: #000;
-            height: 200px;
-        }
-
-        .grid-item img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            display: block;
-            transition: all 0.5s ease;
-            filter: brightness(80%);
-        }
-
-        .grid-item .center-text {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%) scale(0.8);
-            color: white;
-            font-size: 26px;
-            text-shadow:
-                0 0 10px #bf00ff,
-                0 0 20px #bf00ff,
-                0 0 30px #000;
-            opacity: 0;
-            transition: all 0.4s ease;
-            pointer-events: none;
-            text-align: center;
-            width: 90%;
-            white-space: normal;
-            word-wrap: break-word;
-            line-height: 1.2;
-        }
-
-        .grid-item:hover {
-            transform: translateY(-10px) scale(1.03);
-            box-shadow: 0 15px 30px rgba(191, 0, 255, 0.5);
-            z-index: 2;
-        }
-
-        .grid-item:hover img {
-            filter: brightness(30%);
-            transform: scale(1.1);
-        }
-
-        .grid-item:hover .center-text {
-            opacity: 1;
-            transform: translate(-50%, -50%) scale(1);
-        }
-
-        @keyframes slideDown {
-            from {
-                opacity: 0;
-                transform: translateY(-30px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: scale(0.8);
-            }
-
-            to {
-                opacity: 1;
-                transform: scale(1);
-            }
-        }
-    </style>
+    <link rel="icon" href="/images/google.png" type="image/x-icon">
+    <link rel="stylesheet" href="/css.css">
+    <link rel="stylesheet" href="/proxy-fix.css">
 </head>
 
 <body>
 
-    <nav class="sidebar">
+    <audio id="bgAudio" autoplay loop playsinline>
+        <source src="/music/bromeliad.ogg">
+    </audio>
 
-        <div class="sidebar-link interactive-link" data-url="home">
-            <img src="https://via.placeholder.com/100/333333/bf00ff?text=H" alt="Home">
-            <span class="tooltip">Home</span>
+    <div id="authOverlay">
+        <div id="authBox">
+
+            <h2 id="authTitle">Log In to Unbreaking</h2>
+
+            <div id="authMessage"></div>
+
+            <form id="loginForm">
+                <input type="text" id="loginUser" class="authInput" placeholder="Username" required>
+                <input type="password" id="loginPass" class="authInput" placeholder="Password" required>
+                <button type="submit" class="authBtn">Log In</button>
+            </form>
+
+            <form id="signupForm" style="display:none;">
+                <input type="text" id="signupUser" class="authInput" placeholder="New Username" required>
+                <input type="email" id="signupEmail" class="authInput" placeholder="Email Address" required>
+                <input type="password" id="signupPass" class="authInput" placeholder="New Password" required>
+                <button type="submit" class="authBtn">Create Account</button>
+            </form>
+
+            <div id="toggleAuthBtn" class="toggleAuth">Sign Up</div>
+
         </div>
+    </div>
 
-        <div class="sidebar-link interactive-link" data-url="special-page">
-            <img src="https://via.placeholder.com/100/333333/bf00ff?text=S" alt="Special Page">
-            <span class="tooltip">Minecraft</span>
-        </div>
+    <div id="sspModalOverlay" class="sspModalOverlay">
+        <div class="sspModalBox" role="dialog" aria-modal="true">
 
-        <div class="sidebar-link interactive-link" data-url="/p">
-            <img src="https://via.placeholder.com/100/333333/bf00ff?text=W" alt="Wiki">
-            <span class="tooltip">Proxy</span>
-        </div>
+            <h3 id="sspModalTitle" class="sspModalTitle"></h3>
 
-        <div class="sidebar-link" id="googleSidebarBtn">
-            <img src="https://via.placeholder.com/100/333333/bf00ff?text=G" alt="Minecraft">
-            <span class="tooltip">Open Minecraft</span>
-        </div>
+            <p id="sspModalText" class="sspModalText"></p>
 
-        <div class="sidebar-divider"></div>
+            <textarea id="sspModalInput"
+                class="sspModalInput"
+                style="display:none;"
+                maxlength="500"></textarea>
 
-        <div class="sidebar-link action-btn" id="btnFullscreen">
-            <div class="icon-symbol">⛶</div>
-            <span class="tooltip">Fullscreen</span>
-        </div>
-
-        <div class="sidebar-link action-btn" id="btnRefresh">
-            <div class="icon-symbol">⟳</div>
-            <span class="tooltip">Refresh</span>
-        </div>
-
-        <img
-            class="sidebar-extra-img"
-            src="https://via.placeholder.com/100/111111/555555?text=Img"
-            alt="Bottom Image"
-        >
-
-    </nav>
-
-    <main class="main-content">
-
-        <iframe id="contentFrame" class="content-frame"></iframe>
-
-        <div id="customPage" class="custom-page-container">
-
-            <h1>Minecraft</h1>
-
-            <h2>Minecraft Name: Unbreaking One</h2>
-
-            <h2>
-                Join my Minecraft server<br>
-                IP: unbreaking.duckdns.org<br>
-                Port: 19132
-            </h2>
-
-            <div id="googleInternalBtn" class="real-link-btn">
-                Open Minecraft
+            <div class="sspModalButtons">
+                <button id="sspModalCancel" class="sspModalBtn">Cancel</button>
+                <button id="sspModalConfirm" class="sspModalBtn primary">Confirm</button>
             </div>
 
         </div>
+    </div>
 
-        <div class="search-container" id="searchContainer">
+    <canvas id="particleCanvas"></canvas>
 
-            <input
-                type="text"
-                id="searchBar"
-                class="search-bar"
-                placeholder="Search here..."
-                autocomplete="off"
-            >
+    <div id="clock"></div>
+
+    <section id="aiChatWidget" aria-label="Tempest AI chat">
+        <button id="aiChatHideBtn" type="button" aria-label="Hide AI chat">−</button>
+
+        <div id="aiChatMessages" aria-live="polite">
+            <div class="aiChatMessage aiMessage">Hey, I am Tempest AI. Ask me anything and I will help.</div>
+        </div>
+
+        <form id="aiChatForm" autocomplete="off">
+            <textarea id="aiChatInput"
+                rows="2"
+                maxlength="1000"
+                placeholder="Ask Tempest AI..."></textarea>
+            <button id="aiChatSend" type="submit">Send</button>
+        </form>
+
+    </section>
+
+    <div id="sideNavBar">
+
+        <h1 id="titleHeader" class="nav-title">Unbreaking</h1>
+
+        <button onclick="fullscreenFrame()" class="topBtn">⛶</button>
+        <button onclick="refreshFrame()" class="topBtn">⟳</button>
+
+        <div id="userMenuWrap">
+            <button id="userMenuBtn" type="button"></button>
+        </div>
+
+        <a class="nav-item" onclick="showProxy()">
+            <img src="/images/proxy.png" alt="Proxy">
+            <span>Proxy</span>
+        </a>
+
+        <a class="nav-item" onclick="showGames()">
+            <img src="/images/games.png" alt="Games">
+            <span>Games</span>
+        </a>
+
+        <a class="nav-item" onclick="showApps()">
+            <img src="/images/apps.png" alt="Apps">
+            <span>Apps</span>
+        </a>
+
+        <a class="nav-item" onclick="showRequest()">
+            <img src="/images/request.png" alt="Request/Report">
+            <span>Request/Report</span>
+        </a>
+
+
+        <img id="settingsIcon" src="/images/settings.png" alt="Settings">
+
+    </div>
+
+    <div id="userDropdown">
+        <button id="userLogoutBtn" type="button">Log Out</button>
+    </div>
+
+    <div id="settingsMenu">
+
+        <h3>General</h3>
+
+        <label>
+            <input type="checkbox" id="toggleGlow">
+            Glow Effects
+        </label>
+
+        <label>
+            <input type="checkbox" id="toggleClock">
+            Show Clock
+        </label>
+
+        <label>
+            <input type="checkbox" id="toggleAi">
+            Show AI
+        </label>
+
+        <label>
+            <input type="checkbox" id="toggleMusic" checked>
+            Music On
+        </label>
+
+        <label>
+            Music Track:
+            <select id="musicTrackSelect"></select>
+        </label>
+
+        <h3>Appearance</h3>
+
+        <label>
+            Glow Color:
+            <input type="color" id="glowColor" value="#9b59b6">
+        </label>
+
+        <label>
+            <input type="checkbox" id="toggleFullscreen">
+            Fullscreen
+        </label>
+
+        <h3>Tools</h3>
+
+        <button class="tool-btn" onclick="runTool('autoclicker')">
+            Autoclicker
+        </button>
+
+        <button class="tool-btn" onclick="runTool('asteroids')">
+            Asteroids
+        </button>
+
+
+        <button class="tool-btn"
+            id="adminPanelBtn"
+            style="display:none;"
+            onclick="showAdmin()">
+
+            Admin Panel
+
+        </button>
+
+    </div>
+
+    <div id="mainContent">
+
+        <!-- HOME -->
+
+        <div id="homeContent">
+
+            <h1 id="homeTitle">Unbreaking</h1>
+
+            <form id="homeSearchForm" autocomplete="off">
+                <input id="homeSearchInput"
+                    type="text"
+                    placeholder="Search or enter URL..."
+                    maxlength="1000"
+                    required>
+            </form>
+
+            <p id="homeHint">
+                If it says there is an error loading your page or something
+                just click refresh that will fix it
+            </p>
 
         </div>
 
-        <div class="grid-container" id="gridContainer">
+        <!-- ADMIN -->
 
-            <!-- ORIGINAL 6 -->
+        <div id="adminDashboard">
 
-            <div class="grid-item interactive-link"
-                data-name="Background Remover"
-                data-url="/bgremover">
-                <img src="/bgremover.png" alt="Background Remover">
-                <div class="center-text">Background Remover</div>
+            <h1>Admin Controls</h1>
+
+            <div class="adminSectionTitle">Users</div>
+
+            <div class="adminSearchWrap">
+                <input id="adminSearchBar"
+                    type="text"
+                    placeholder="Search players by username or email...">
             </div>
 
-            <div class="grid-item interactive-link"
-                data-name="Code Editor"
-                data-url="/codeedit">
-                <img src="/codeedit.png" alt="Code Editor">
-                <div class="center-text">Code Editor</div>
+            <table class="adminTable">
+
+                <thead>
+                    <tr>
+                        <th>Username</th>
+                        <th>Email</th>
+                        <th>Status</th>
+                        <th>Online</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+
+                <tbody id="adminUserTableBody"></tbody>
+
+            </table>
+
+            <div class="adminSectionTitle">
+                Custom Games
             </div>
 
-            <div class="grid-item interactive-link"
-                data-name="File Converter"
-                data-url="/fileconverter">
-                <img src="/fileconverter.png" alt="File Converter">
-                <div class="center-text">File Converter</div>
+            <table class="adminTable">
+
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Owner</th>
+                        <th>Type</th>
+                        <th>Target</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+
+                <tbody id="adminCustomGameTableBody"></tbody>
+
+            </table>
+
+            <div class="adminSectionTitle">
+                Request / Report Submissions
             </div>
 
-            <div class="grid-item interactive-link"
-                data-name="Sandbox"
-                data-url="/sandbox">
-                <img src="/sandbox.png" alt="Sandbox">
-                <div class="center-text">Sandbox</div>
+            <table class="adminTable">
+
+                <thead>
+                    <tr>
+                        <th>When</th>
+                        <th>User</th>
+                        <th>Type</th>
+                        <th>Subject</th>
+                        <th>Details</th>
+                        <th>Page URL</th>
+                    </tr>
+                </thead>
+
+                <tbody id="adminRequestTableBody"></tbody>
+
+            </table>
+
+        </div>
+
+        <!-- GAMES -->
+
+        <div id="gamesContent">
+
+            <div class="gamesTopBar">
+
+                <input type="text"
+                    class="searchBar"
+                    id="gamesSearchBar"
+                    placeholder="Search for a game...">
+
+                <button id="addGameBtn" type="button">Add</button>
+
             </div>
 
-            <div class="grid-item interactive-link"
-                data-name="Link Viewer"
-                data-url="/webcrawler">
-                <img src="/webcrawler.png" alt="Link Viewer">
-                <div class="center-text">Link Viewer</div>
+            <div id="addGamePanel">
+
+                <h3>Add a custom game</h3>
+
+                <form id="addGameForm">
+
+                    <div class="addGameField">
+                        <label for="addGameName">Name</label>
+
+                        <input id="addGameName"
+                            type="text"
+                            maxlength="120"
+                            required
+                            placeholder="Example: My Cool Game">
+                    </div>
+
+                    <div class="addGameField">
+                        <label for="addGameType">Type</label>
+
+                        <select id="addGameType">
+                            <option value="url">URL</option>
+                            <option value="html">HTML</option>
+                        </select>
+                    </div>
+
+                    <div class="addGameField" id="addGameUrlWrap">
+                        <label for="addGameUrl">URL / Search text</label>
+
+                        <input id="addGameUrl"
+                            type="text"
+                            placeholder="Example: https://example.com">
+                    </div>
+
+                    <div class="addGameField"
+                        id="addGameHtmlWrap"
+                        style="display:none">
+
+                        <label for="addGameHtml">HTML code</label>
+
+                        <textarea id="addGameHtml"
+                            placeholder="Paste full HTML here"></textarea>
+
+                        <p id="htmlHelpText">
+                            <a href="https://docs.google.com/document/d/1_FmH3BlSBQI7FGgAQL59-ZPe8eCxs35wel6JUyVaG8Q/edit?tab=t.0"
+                                target="_blank"
+                                rel="noopener noreferrer">
+
+                                Go on this doc and choose a game and click on it then copy all of the code and paste it into here
+
+                            </a>
+                        </p>
+
+                    </div>
+
+                    <div class="addGameField">
+                        <label for="addGameIcon">Icon image</label>
+                        <input id="addGameIcon" type="file" accept="image/*">
+                    </div>
+
+                    <div class="addGameActions">
+                        <button type="button" id="cancelAddGameBtn">
+                            Cancel
+                        </button>
+
+                        <button type="submit">
+                            Save Game
+                        </button>
+                    </div>
+
+                </form>
+
             </div>
 
-            <div class="grid-item interactive-link"
-                data-name="Among Us"
-                data-url="/amongus">
-                <img src="/amongus.png" alt="Among Us">
-                <div class="center-text">Among Us</div>
-            </div>
+            <div class="linksContainer" id="gamesLinksContainer">
 
+                <div class="gameCard" onclick="loadGame('/game/amongus')">
+                    <img src="/images/amongus.png" alt="Among Us">
+                    <div class="gameTitle">Among Us</div>
+                </div>
 
-            <div class="grid-item interactive-link"
-                data-name="Awesome Tanks 2"
-                data-url="/awesometanks2">
-                <img src="awesometanks2.png" alt="Google">
-                <div class="center-text">Awesome Tanks 2</div>
-            </div>
+                <div class="gameCard" onclick="loadGame('/search/https://aw2-tau.vercel.app')">
+                    <img src="/images/awesometanks2.png" alt="Awesome Tanks 2">
+                    <div class="gameTitle">Awesome Tanks 2</div>
+                </div>
 
-            <div class="grid-item interactive-link"
-                data-name="Drift Boss"
-                data-url="/driftboss">
-                <img src="/driftboss.png" alt="YouTube">
-                <div class="center-text">Drift Boss</div>
-            </div>
+                <div class="gameCard" onclick="loadGame('/search/https://copter.io')">
+                    <img src="/images/copterio.png" alt="Copter.io">
+                    <div class="gameTitle">Copter.io</div>
+                </div>
 
-            <div class="grid-item interactive-link"
-                data-name="Eaglercraft"
-                data-url="/eaglercraft">
-                <img src="/eaglercraft.png" alt="GitHub">
-                <div class="center-text">Eaglercraft</div>
-            </div>
+                <div class="gameCard" onclick="loadGame('/game/driftboss')">
+                    <img src="/images/driftboss.png" alt="Drift Boss">
+                    <div class="gameTitle">Drift Boss</div>
+                </div>
 
-            <div class="grid-item interactive-link"
-                data-name="Geometry Dash"
-                data-url="/geometrydash">
-                <img src="/geometrydash.png" alt="Wikipedia">
-                <div class="center-text">Geometry Dash</div>
-            </div>
+                <div class="gameCard" onclick="loadGame('/game/eaglercraft')">
+                    <img src="/images/eaglercraft.png" alt="Eaglercraft">
+                    <div class="gameTitle">Eaglercraft</div>
+                </div>
+                
+                <div class="gameCard" onclick="loadGame('/search/https://hexanaut.io')">
+                    <img src="/images/hexanautio.png" alt="Hexanaut.io">
+                    <div class="gameTitle">Hexanaut.io</div>
+                </div>
 
-            <div class="grid-item interactive-link"
-                data-name="Grindcraft"
-                data-url="/grindcraft">
-                <img src="/grindcraft.png" alt="Reddit">
-                <div class="center-text">Grindcraft</div>
-            </div>
+                <div class="gameCard" onclick="loadGame('/game/geometrydash')">
+                    <img src="/images/geometrydash.png" alt="Geometry Dash">
+                    <div class="gameTitle">Geometry Dash</div>
+                </div>
 
-            <div class="grid-item interactive-link"
-                data-name="Hollow Knight"
-                data-url="/hollowknight">
-                <img src="/hollowknight.png" alt="Discord">
-                <div class="center-text">Hollow Knight</div>
-            </div>
+                <div class="gameCard" onclick="loadGame('/game/grindcraft')">
+                    <img src="/images/grindcraft.png" alt="Grindcraft">
+                    <div class="gameTitle">Grindcraft</div>
+                </div>
 
-            <div class="grid-item interactive-link"
-                data-name="Monkey Mart"
-                data-url="/monkeymart">
-                <img src="/monkeymart.png" alt="Twitch">
-                <div class="center-text">Monkey Mart</div>
-            </div>
+                <div class="gameCard" onclick="loadGame('/game/hollowknight')">
+                    <img src="/images/hollowknight.png" alt="Hollow Knight">
+                    <div class="gameTitle">Hollow Knight</div>
+                </div>
 
-            <div class="grid-item interactive-link"
-                data-name="Paper Minecraft"
-                data-url="/paperminecraft">
-                <img src="/paperminecraft.png" alt="Spotify">
-                <div class="center-text">Paper Minecraft</div>
-            </div>
+                <div class="gameCard" onclick="loadGame('/game/monkeymart')">
+                    <img src="/images/monkeymart.png" alt="Monkey Mart">
+                    <div class="gameTitle">Monkey Mart</div>
+                </div>
 
-            <div class="grid-item interactive-link"
-                data-name="Ragdoll Archers"
-                data-url="/ragdollarchers">
-                <img src="/ragdollarchers.png" alt="Netflix">
-                <div class="center-text">Ragdoll Archers</div>
-            </div>
+                <div class="gameCard" onclick="loadGame('/game/paperminecraft')">
+                    <img src="/images/paperminecraft.png" alt="Paper Minecraft">
+                    <div class="gameTitle">Paper Minecraft</div>
+                </div>
 
-            <div class="grid-item interactive-link"
-                data-name="Ragdoll Hit"
-                data-url="/ragdollhit">
-                <img src="/ragdollhit.png" alt="Steam">
-                <div class="center-text">Ragdoll Hit</div>
-            </div>
+                <div class="gameCard" onclick="loadGame('/game/ragdollarchers')">
+                    <img src="/images/ragdollarchers.png" alt="Ragdoll Archers">
+                    <div class="gameTitle">Ragdoll Archers</div>
+                </div>
 
-            <div class="grid-item interactive-link"
-                data-name="Rocket League"
-                data-url="/rocketleague">
-                <img src="/rocketleague.png" alt="Minecraft">
-                <div class="center-text">Rocket League</div>
-            </div>
+                <div class="gameCard" onclick="loadGame('/game/ragdollhit')">
+                    <img src="/images/ragdollhit.png" alt="Ragdoll Hit">
+                    <div class="gameTitle">Ragdoll Hit</div>
+                </div>
 
-            <div class="grid-item interactive-link"
-                data-name="Run 3"
-                data-url="/run3">
-                <img src="/run3.png" alt="Cool Math Games">
-                <div class="center-text">Run 3</div>
-            </div>
+                <div class="gameCard" onclick="loadGame('/game/rocketleague')">
+                    <img src="/images/rocketleague.png" alt="Rocket League">
+                    <div class="gameTitle">Rocket League</div>
+                </div>
 
-            <div class="grid-item interactive-link"
-                data-name="Smash Karts"
-                data-url="/smashcarts">
-                <img src="/smashcarts" alt="Google Drive">
-                <div class="center-text">Smash Karts</div>
-            </div>
+                <div class="gameCard" onclick="loadGame('/game/run3')">
+                    <img src="/images/run3.png" alt="Run 3">
+                    <div class="gameTitle">Run 3</div>
+                </div>
 
-            <div class="grid-item interactive-link"
-                data-name="Snow Rider"
-                data-url="/snowrider">
-                <img src="/snowrider.png" alt="Google Docs">
-                <div class="center-text">Snow Rider</div>
-            </div>
+                <div class="gameCard" onclick="loadGame('/game/smashcarts')">
+                    <img src="/images/smashcarts.png" alt="Smash Carts">
+                    <div class="gameTitle">Smash Carts</div>
+                </div>
 
-            <div class="grid-item interactive-link"
-                data-name="Soccer Random"
-                data-url="/soccerrandom">
-                <img src="/soccerrandom.png" alt="Google Translate">
-                <div class="center-text">Soccer Random</div>
-            </div>
+                <div class="gameCard" onclick="loadGame('/game/snowrider')">
+                    <img src="/images/snowrider.png" alt="Snow Rider 3D">
+                    <div class="gameTitle">Snow Rider 3D</div>
+                </div>
 
-            <div class="grid-item interactive-link"
-                data-name="Survival Race"
-                data-url="/survivalrace">
-                <img src="/survivalrace.png" alt="Google Maps">
-                <div class="center-text">Survival Race</div>
-            </div>
+                <div class="gameCard" onclick="loadGame('/game/soccerrandom')">
+                    <img src="/images/soccerrandom.png" alt="Soccer Random">
+                    <div class="gameTitle">Soccer Random</div>
+                </div>
 
-            <div class="grid-item interactive-link"
-                data-name="Survivor Game"
-                data-url="/survivor">
-                <img src="/survivor.png" alt="Bing">
-                <div class="center-text">Survivor Game</div>
-            </div>
+                <div class="gameCard" onclick="loadGame('/game/survivalrace')">
+                    <img src="/images/survivalrace.png" alt="Survival Race">
+                    <div class="gameTitle">Survival Race</div>
+                </div>
 
-            <div class="grid-item interactive-link"
-                data-name="Survivor io"
-                data-url="/survivorio">
-                <img src="/survivorio.png" alt="DuckDuckGo">
-                <div class="center-text">Survivor io</div>
-            </div>
+                <div class="gameCard" onclick="loadGame('/game/survivor')">
+                    <img src="/images/survivor.png" alt="Survivor Game">
+                    <div class="gameTitle">Survivor Game</div>
+                </div>
 
-            <div class="grid-item interactive-link"
-                data-name="The Final Earth 2"
-                data-url="/thefinalearth2">
-                <img src="/thefinalearth2.png" alt="Archive">
-                <div class="center-text">The Final Earth 2</div>
-            </div>
+                <div class="gameCard" onclick="loadGame('/game/survivorio')">
+                    <img src="/images/survivorio.png" alt="Survivor Io">
+                    <div class="gameTitle">Survivor Io</div>
+                </div>
 
-            <div class="grid-item interactive-link"
-                data-name="Tomb of the Mask"
-                data-url="/tombofthemask">
-                <img src="/tombofthemask.png" alt="CodePen">
-                <div class="center-text">Tomb of the Mask</div>
-            </div>
+                <div class="gameCard" onclick="loadGame('/game/thefinalearth2')">
+                    <img src="/images/thefinalearth2.png" alt="The Final Earth 2">
+                    <div class="gameTitle">The Final Earth 2</div>
+                </div>
 
-            <div class="grid-item interactive-link"
-                data-name="Yohoho io"
-                data-url="/yohohoio">
-                <img src="/yohohoio.png" alt="Neocities">
-                <div class="center-text">Yohoho io</div>
+                <div class="gameCard" onclick="loadGame('/game/tombofthemask')">
+                    <img src="/images/tombofthemask.png" alt="Tomb of the Mask">
+                    <div class="gameTitle">Tomb of the Mask</div>
+                </div>
+
+                <div class="gameCard" onclick="loadGame('/game/yohohoio')">
+                    <img src="/images/yohohoio.png" alt="Yohoho Io">
+                    <div class="gameTitle">Yohoho Io</div>
+                </div>
+
             </div>
 
         </div>
 
-    </main>
+        <!-- APPS -->
 
-    <script>
+        <div id="appsContent">
 
-        /* ============================
-           SEARCH
-        ============================ */
+            <input type="text"
+                class="searchBar"
+                id="appsSearchBar"
+                placeholder="Search for an app...">
 
-        const searchInput = document.getElementById('searchBar');
-        const gridItems = document.querySelectorAll('.grid-item');
+            <div class="linksContainer" id="appsLinksContainer">
 
-        searchInput.addEventListener('input', function(event) {
+                <div class="gameCard" onclick="loadGame('/app/bgremover')">
+                    <img src="/images/bgremover.png" alt="Background Remover">
+                    <div class="gameTitle">Background Remover</div>
+                </div>
 
-            const searchText =
-                event.target.value.toLowerCase().trim();
+                <div class="gameCard" onclick="loadGame('/search/https://codebeautify.org/htmlviewer')">
+                    <img src="/images/codeedit.png" alt="Code Editor">
+                    <div class="gameTitle">Code Editor</div>
+                </div>
 
-            gridItems.forEach(function(item) {
+                <div class="gameCard" onclick="loadGame('/search/https://crazygames.com')">
+                    <img src="/images/crazygames.png" alt="Crazy Games" onerror="this.onerror=null;this.src='/images/games.png';">
+                    <div class="gameTitle">Crazy Games</div>
+                </div>
 
-                const itemName =
-                    item.getAttribute('data-name').toLowerCase();
 
-                if (itemName.includes(searchText)) {
+                <div class="gameCard" onclick="loadGame('/app/elements')">
+                    <img src="/images/elements.png" alt="Elements">
+                    <div class="gameTitle">Elements</div>
+                </div>
 
-                    item.style.display = 'block';
+                <div class="gameCard" onclick="loadGame('/app/fileconverter')">
+                    <img src="/images/fileconverter.png" alt="File Converter">
+                    <div class="gameTitle">File Converter</div>
+                </div>
 
-                } else {
+                <div class="gameCard" onclick="loadGame('/search/https://freedns.afraid.org')">
+                    <img src="/images/freedns.png" alt="Free DNS">
+                    <div class="gameTitle">Free DNS</div>
+                </div>
 
-                    item.style.display = 'none';
+                <div class="gameCard" onclick="loadGame('/search/https://iogames.space')">
+                    <img src="/images/iogames.png" alt="Io Games" onerror="this.onerror=null;this.src='/images/copterio.png';">
+                    <div class="gameTitle">Io Games</div>
+                </div>
 
-                }
+                <div class="gameCard" onclick="loadGame('/search/https://gim.villainsrule.xyz')">
+                    <img src="/images/gimkithacks.png" alt="Gimkit with Hacks">
+                    <div class="gameTitle">Gimkit with Hacks</div>
+                </div>
 
-            });
+                <div class="gameCard" onclick="loadGame('/search/https://tcgplayer.com')">
+                    <img src="/images/tcgplayer.png" alt="TCG Player" onerror="this.onerror=null;this.src='/images/mtglife.png';">
+                    <div class="gameTitle">TCG Player</div>
+                </div>
 
-        });
+                <div class="gameCard" onclick="loadGame('/app/sandbox')">
+                    <img src="/images/sandbox.png" alt="Sandbox">
+                    <div class="gameTitle">Sandbox</div>
+                </div>
 
+                <div class="gameCard" onclick="loadGame('/search/https://ssp-link-viewer.vercel.app')">
+                    <img src="/images/webcrawler.png" alt="Link Viewer">
+                    <div class="gameTitle">Link Viewer</div>
+                </div>
 
-        /* ============================
-           PAGE NAVIGATION
-        ============================ */
+                <div class="gameCard" onclick="loadGame('/search/https://youtube.com')">
+                    <img src="/images/youtube.png" alt="Youtube" onerror="this.onerror=null;this.src='/images/webcrawler.png';">
+                    <div class="gameTitle">Youtube</div>
+                </div>
 
-        const interactiveLinks =
-            document.querySelectorAll('.interactive-link');
+                </div>
 
-        const contentFrame =
-            document.getElementById('contentFrame');
+            </div>
 
-        const gridContainer =
-            document.getElementById('gridContainer');
+        </div>
 
-        const searchContainer =
-            document.getElementById('searchContainer');
+        <!-- REQUEST -->
 
-        const customPage =
-            document.getElementById('customPage');
+        <div id="requestContent">
 
+            <h1>Request/Report</h1>
 
-        interactiveLinks.forEach(link => {
+            <div id="requestCard">
 
-            link.addEventListener('click', function() {
+                <label class="requestFieldLabel" for="requestType">
+                    Type
+                </label>
 
-                const targetUrl =
-                    this.getAttribute('data-url');
+                <select id="requestType" class="requestSelect">
+                    <option value="request">Request</option>
+                    <option value="report">Report</option>
+                </select>
 
-                contentFrame.style.display = 'none';
-                gridContainer.style.display = 'none';
-                searchContainer.style.display = 'none';
-                customPage.style.display = 'none';
+                <label class="requestFieldLabel" for="requestSubject">
+                    Subject
+                </label>
 
+                <input id="requestSubject"
+                    class="requestInput"
+                    type="text"
+                    maxlength="255"
+                    placeholder="Short title for your request/report">
 
-                if (targetUrl === 'home') {
+                <label class="requestFieldLabel" for="requestDetails">
+                    Details
+                </label>
 
-                    contentFrame.src = '';
+                <textarea id="requestDetails"
+                    class="requestTextarea"
+                    maxlength="4000"
+                    placeholder="Explain what you need or what issue happened."></textarea>
 
-                    gridContainer.style.display = 'grid';
-                    searchContainer.style.display = 'flex';
+                <label class="requestFieldLabel" for="requestPageUrl">
+                    Page URL (optional)
+                </label>
 
-                }
+                <input id="requestPageUrl"
+                    class="requestInput"
+                    type="text"
+                    maxlength="1000"
+                    placeholder="Example: https://example.com">
 
-                else if (targetUrl === 'special-page') {
+                <button id="requestSubmitBtn"
+                    class="authBtn"
+                    type="button">
 
-                    contentFrame.src = '';
+                    Submit
 
-                    customPage.style.display = 'flex';
+                </button>
 
-                }
+                <div id="requestStatus"></div>
 
-                else {
+            </div>
 
-                    contentFrame.src = targetUrl;
-                    contentFrame.style.display = 'block';
+        </div>
 
-                }
+        <!-- PROXY -->
 
-            });
+        <div id="proxyContent">
 
-        });
+            <iframe id="proxyIframe"
+                src="about:blank"
+                allow="fullscreen *"
+                allowfullscreen
+                webkitallowfullscreen
+                mozallowfullscreen>
+            </iframe>
 
+        </div>
 
-        /* ============================
-           MINECRAFT BUTTONS
-        ============================ */
+        <iframe id="contentFrame"
+            allow="fullscreen *; autoplay *; gamepad *"
+            allowfullscreen
+            webkitallowfullscreen
+            mozallowfullscreen>
+        </iframe>
 
-        document
-            .getElementById('googleSidebarBtn')
-            .addEventListener('click', () => {
+    </div>
 
-                window.location.href = 'minecraft://';
-
-            });
-
-
-        document
-            .getElementById('googleInternalBtn')
-            .addEventListener('click', () => {
-
-                window.location.href = 'minecraft://';
-
-            });
-
-
-        /* ============================
-           FULLSCREEN
-        ============================ */
-
-        const btnFullscreen =
-            document.getElementById('btnFullscreen');
-
-        btnFullscreen.addEventListener('click', () => {
-
-            if (contentFrame.style.display === 'block') {
-
-                if (contentFrame.requestFullscreen) {
-
-                    contentFrame.requestFullscreen();
-
-                }
-
-                else if (contentFrame.webkitRequestFullscreen) {
-
-                    contentFrame.webkitRequestFullscreen();
-
-                }
-
-                else if (contentFrame.msRequestFullscreen) {
-
-                    contentFrame.msRequestFullscreen();
-
-                }
-
-            }
-
-            /* Do nothing if no iframe is open. */
-
-        });
-
-
-        /* ============================
-           REFRESH
-        ============================ */
-
-        const btnRefresh =
-            document.getElementById('btnRefresh');
-
-        btnRefresh.addEventListener('click', () => {
-
-            if (
-                contentFrame.style.display === 'block' &&
-                contentFrame.src !== ''
-            ) {
-
-                const currentUrl =
-                    contentFrame.src;
-
-                contentFrame.src =
-                    currentUrl;
-
-            }
-
-            /* Do nothing if no external page is open. */
-
-        });
-
-    </script>
+    <script src="/js.js"></script>
 
 </body>
+
 </html>
