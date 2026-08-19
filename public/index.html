@@ -104,6 +104,11 @@
             <span>Games</span>
         </a>
 
+        <a class="nav-item" onclick="showApps()">
+            <img src="/images/apps.png" alt="Apps">
+            <span>Apps</span>
+        </a>
+
         <a class="nav-item" onclick="showRequest()">
             <img src="/images/request.png" alt="Request/Report">
             <span>Request/Report</span>
@@ -489,7 +494,20 @@
                     <div class="gameTitle">Yohoho Io</div>
                 </div>
 
-                <!-- APPS MOVED HERE -->
+            </div>
+
+        </div>
+
+        <!-- APPS -->
+
+        <div id="appsContent">
+
+            <input type="text"
+                class="searchBar"
+                id="appsSearchBar"
+                placeholder="Search for an app...">
+
+            <div class="linksContainer" id="appsLinksContainer">
 
                 <div class="gameCard" onclick="loadGame('/app/bgremover')">
                     <img src="/images/bgremover.png" alt="Background Remover">
@@ -550,6 +568,8 @@
                 <div class="gameCard" onclick="loadGame('/search/https://youtube.com')">
                     <img src="/images/youtube.png" alt="Youtube" onerror="this.onerror=null;this.src='/images/webcrawler.png';">
                     <div class="gameTitle">Youtube</div>
+                </div>
+
                 </div>
 
             </div>
