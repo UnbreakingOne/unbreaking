@@ -100,6 +100,11 @@
         </a>
 
         <a class="nav-item" onclick="showGames()">
+            <img src="/images/games.png" alt="Games">
+            <span>Games</span>
+        </a>
+
+        <a class="nav-item" onclick="showApps()">
             <img src="/images/apps.png" alt="Apps">
             <span>Apps</span>
         </a>
@@ -279,7 +284,7 @@
 
         </div>
 
-        <!-- APPS (was Games) -->
+        <!-- GAMES -->
 
         <div id="gamesContent">
 
@@ -288,7 +293,7 @@
                 <input type="text"
                     class="searchBar"
                     id="gamesSearchBar"
-                    placeholder="Search for an app...">
+                    placeholder="Search for a game...">
 
                 <button id="addGameBtn" type="button">Add</button>
 
@@ -489,7 +494,20 @@
                     <div class="gameTitle">Yohoho Io</div>
                 </div>
 
-                <!-- Apps moved here -->
+            </div>
+
+        </div>
+
+        <!-- APPS -->
+
+        <div id="appsContent">
+
+            <input type="text"
+                class="searchBar"
+                id="appsSearchBar"
+                placeholder="Search for an app...">
+
+            <div class="linksContainer" id="appsLinksContainer">
 
                 <div class="gameCard" onclick="loadGame('/app/bgremover')">
                     <img src="/images/bgremover.png" alt="Background Remover">
