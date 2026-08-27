@@ -8,6 +8,11 @@
 		/>
 		<title>Tempest</title>
 		<link rel="shortcut icon" href="/tempest.png" />
+		<script>
+			if (!new URLSearchParams(location.search).has("showbar") && /^(?:\/p)?\/search\//i.test(location.pathname)) {
+				document.documentElement.classList.add("startup-direct-pending");
+			}
+		</script>
 
 		<script src="/scram/scramjet.all.js"></script>
 		<script src="/baremux/index.js"></script>

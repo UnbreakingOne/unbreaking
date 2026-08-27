@@ -618,6 +618,25 @@ img {
   padding: 0 20px;
 }
 
+.linksSectionLabel {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #c8a8f0;
+  font-size: 1.4rem;
+  font-weight: bold;
+  text-shadow: 0 0 10px var(--glow-color);
+}
+
+.linksSectionLabel img {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  object-fit: cover;
+  box-shadow: 0 0 10px var(--glow-color);
+}
+
 .gameCard {
   background: var(--darker-blue);
   border-radius: 15px;
