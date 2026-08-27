@@ -34,6 +34,8 @@ const AUTOCLICKER_URL =
 	"https://cdn.jsdelivr.net/gh/wea-f/Norepted@a4cd53b/bookmarklets/autoclicker.js";
 const ERUDA_URL = "https://cdn.jsdelivr.net/npm/eruda";
 const DEFAULT_FAVICON = "/tempest.png";
+const SCRAMJET_ERROR_RETRIES = 2;
+const SCRAMJET_ERROR_TEXT = "There was an error loading";
 
 const tabs = [];
 let activeTabId = null;
@@ -160,6 +162,11 @@ function updateNavState() {
 	forwardBtn.disabled = tab.historyIndex >= tab.historyStack.length - 1;
 	reloadBtn.disabled = !tab.currentUrl;
 	address.value = tab.displayUrl || tab.currentUrl || "";
+}
+
+function isScramjetErrorDocument(frameDocument) {
+	const text = frameDocument?.body?.innerText || "";
+	return text.includes("Uh oh!") && text.includes(SCRAMJET_ERROR_TEXT);
 }
 
 function setLandingVisible(visible) {
@@ -336,11 +343,31 @@ function startUrlSyncInterval() {
 
 function bindFrameTitleUpdates(tab) {
 	const frameEl = tab.frame.frame;
-	frameEl.addEventListener("load", () => {
+	frameEl.addEventListener("load", async () => {
 		tab.erudaVisible = false;
+
+		let frameDoc = null;
+		try {
+			frameDoc = frameEl.contentWindow?.document || null;
+		} catch {
+			frameDoc = null;
+		}
+
+		if (frameDoc && isScramjetErrorDocument(frameDoc) && tab.lastDestination) {
+			tab.errorRetryCount += 1;
+			try {
+				await ensureTransportReady();
+			} catch {
+				// Keep the Scramjet error page hidden while the retry is scheduled.
+			}
+
+			const retryDelay = tab.errorRetryCount <= SCRAMJET_ERROR_RETRIES ? 600 : 1800;
+			window.setTimeout(() => tab.frame.go(tab.lastDestination), retryDelay);
+			return;
+		}
+
 		syncTabLocationFromFrame(tab);
 		try {
-			const frameDoc = frameEl.contentWindow?.document;
 			if (frameDoc?.title && frameDoc.title.trim()) {
 				tab.title = frameDoc.title.trim();
 			} else {
@@ -386,6 +413,8 @@ async function navigate(
 	tab.title = labelFromUrl(tab.displayUrl);
 	tab.faviconUrl = faviconUrlForPage(prettyDest, tab.displayUrl);
 	tab.erudaVisible = false;
+	tab.lastDestination = destination;
+	tab.errorRetryCount = 0;
 	inspectBtn.classList.remove("inspect-active");
 
 	if (tab.frame.frame.hasAttribute("srcdoc")) {
@@ -437,6 +466,8 @@ function createTab(startUrl = "", activate = true) {
 		historyStack: [],
 		displayHistoryStack: [],
 		historyIndex: -1,
+		lastDestination: "",
+		errorRetryCount: 0,
 		frame: scramjet.createFrame(),
 		button: null,
 	};
@@ -625,7 +656,11 @@ forwardBtn.addEventListener("click", async () => {
 
 reloadBtn.addEventListener("click", () => {
 	const tab = currentTab();
-	if (tab?.currentUrl) tab.frame.go(tab.currentUrl);
+	if (tab?.currentUrl) {
+		clearErrors();
+		tab.errorRetryCount = 0;
+		tab.frame.go(tab.lastDestination || tab.currentUrl);
+	}
 });
 
 async function enterFullscreen(element) {
