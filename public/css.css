@@ -441,7 +441,6 @@ img {
 
 
 #gamesContent,
-#appsContent,
 #requestContent,
 #adminDashboard,
 #proxyContent {
@@ -1166,21 +1165,18 @@ img {
 }
 
 #gamesContent::-webkit-scrollbar,
-#appsContent::-webkit-scrollbar,
 #requestContent::-webkit-scrollbar,
 #adminDashboard::-webkit-scrollbar {
   width: 8px;
 }
 
 #gamesContent::-webkit-scrollbar-track,
-#appsContent::-webkit-scrollbar-track,
 #requestContent::-webkit-scrollbar-track,
 #adminDashboard::-webkit-scrollbar-track {
   background: var(--dark-blue-bg);
 }
 
 #gamesContent::-webkit-scrollbar-thumb,
-#appsContent::-webkit-scrollbar-thumb,
 #requestContent::-webkit-scrollbar-thumb,
 #adminDashboard::-webkit-scrollbar-thumb {
   background: var(--glow-color);
