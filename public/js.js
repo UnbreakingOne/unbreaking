@@ -33,7 +33,6 @@
             const mainContent = document.getElementById('mainContent');
             const homeContent = document.getElementById('homeContent');
             const gamesContent = document.getElementById('gamesContent');
-            const appsContent = document.getElementById('appsContent');
             const requestContent = document.getElementById('requestContent');
             const proxyContent = document.getElementById('proxyContent');
             const adminDashboard = document.getElementById('adminDashboard');
@@ -897,7 +896,6 @@
                 clearEmbeddedFrameActive();
                 homeContent.style.display = "none";
                 gamesContent.style.display = "none";
-                appsContent.style.display = "none";
                 requestContent.style.display = "none";
                 proxyContent.style.display = "none";
                 adminDashboard.style.display = "none";
@@ -939,12 +937,6 @@
             window.showGames = function () {
                 hideAllSections();
                 gamesContent.style.display = "block";
-                contentFrame.src = "";
-            };
-
-            window.showApps = function () {
-                hideAllSections();
-                appsContent.style.display = "block";
                 contentFrame.src = "";
             };
 
@@ -1331,7 +1323,6 @@
                 });
             }
             setupSearch('gamesSearchBar', 'gamesLinksContainer');
-            setupSearch('appsSearchBar', 'appsLinksContainer');
 
             homeSearchForm.addEventListener('submit', (e) => {
                 e.preventDefault();
