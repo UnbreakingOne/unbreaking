@@ -164,6 +164,13 @@ function updateNavState() {
 	address.value = tab.displayUrl || tab.currentUrl || "";
 }
 
+function setTabLoading(tab, loading) {
+	if (!tab) return;
+	tab.loading = loading;
+	tab.frame.frame.classList.toggle("is-loading", loading);
+	browserShell.classList.toggle("is-loading", tabs.some((item) => item.loading));
+}
+
 function isScramjetErrorDocument(frameDocument) {
 	const text = frameDocument?.body?.innerText || "";
 	return text.includes("Uh oh!") && text.includes(SCRAMJET_ERROR_TEXT);
@@ -355,6 +362,7 @@ function bindFrameTitleUpdates(tab) {
 
 		if (frameDoc && isScramjetErrorDocument(frameDoc) && tab.lastDestination) {
 			tab.errorRetryCount += 1;
+			setTabLoading(tab, true);
 			try {
 				await ensureTransportReady();
 			} catch {
@@ -366,6 +374,7 @@ function bindFrameTitleUpdates(tab) {
 			return;
 		}
 
+		setTabLoading(tab, false);
 		syncTabLocationFromFrame(tab);
 		try {
 			if (frameDoc?.title && frameDoc.title.trim()) {
@@ -421,6 +430,7 @@ async function navigate(
 		tab.frame.frame.removeAttribute("srcdoc");
 	}
 
+	setTabLoading(tab, true);
 	tab.frame.go(destination);
 
 	if (pushHistory) {
@@ -466,6 +476,7 @@ function createTab(startUrl = "", activate = true) {
 		historyStack: [],
 		displayHistoryStack: [],
 		historyIndex: -1,
+		loading: false,
 		lastDestination: "",
 		errorRetryCount: 0,
 		frame: scramjet.createFrame(),
@@ -659,6 +670,7 @@ reloadBtn.addEventListener("click", () => {
 	if (tab?.currentUrl) {
 		clearErrors();
 		tab.errorRetryCount = 0;
+		setTabLoading(tab, true);
 		tab.frame.go(tab.lastDestination || tab.currentUrl);
 	}
 });

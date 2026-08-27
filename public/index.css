@@ -260,6 +260,27 @@ input, button, textarea, select {
   background: var(--bg);
 }
 
+.view-host::after {
+  content: "Loading proxy page...";
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: radial-gradient(circle at center, rgba(153, 102, 255, 0.2), rgba(10, 10, 18, 0.96));
+  color: var(--text);
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  z-index: 4;
+}
+
+.browser-shell.is-loading .view-host::after {
+  display: flex;
+}
+
 .landing,
 .tab-frame {
   position: absolute;
@@ -271,6 +292,10 @@ input, button, textarea, select {
 .landing.active,
 .tab-frame.active {
   display: flex;
+}
+
+.tab-frame.is-loading {
+  opacity: 0;
 }
 
 /* ──────────────────────────────────────────
