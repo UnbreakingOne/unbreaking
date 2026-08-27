@@ -218,7 +218,7 @@
                             const reason = data.banReason || "No reason provided";
                             await openSiteModal({
                                 title: "Account Banned",
-                                text: `You are banned from SSP.\nReason: ${reason}`,
+                                text: `You are banned from Unbreaking.\nReason: ${reason}`,
                                 confirmText: "OK",
                                 cancelText: "Close",
                                 dismissible: true
@@ -303,7 +303,7 @@
                     renderAdminTable();
                 } catch (_) {
                     const tbody = document.getElementById('adminUserTableBody');
-                    tbody.innerHTML = `<tr><td colspan="5">Could not load user data.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="5">Neon link broke</td></tr>`;
                 }
             }
 
@@ -367,7 +367,7 @@
                     });
                 } catch (_) {
                     const tbody = document.getElementById('adminRequestTableBody');
-                    tbody.innerHTML = `<tr><td colspan="6">Could not load request submissions.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="6">Neon link broke</td></tr>`;
                 }
             }
 
@@ -447,7 +447,7 @@
                         confirmText: "Ban User",
                         cancelText: "Cancel",
                         showInput: true,
-                        placeholder: "Example: Harassment in chat",
+                        placeholder: "Being mean.",
                         dangerConfirm: true
                     });
 
@@ -1147,7 +1147,7 @@
                     const data = await response.json().catch(() => ({}));
 
                     if (!response.ok) {
-                        throw new Error(data.error || 'Tempest AI could not answer right now.');
+                        throw new Error(data.error || 'Unbreaking AI could not answer right now.');
                     }
 
                     const answer = data.reply || 'I did not get a response.';
@@ -1156,7 +1156,7 @@
 
                     while (aiConversation.length > 12) aiConversation.shift();
                 } catch (err) {
-                    typingMessage.textContent = err.message || 'Tempest AI had a problem answering.';
+                    typingMessage.textContent = err.message || 'Unbreaking AI had a problem answering.';
                     typingMessage.classList.add('aiErrorMessage');
                 } finally {
                     setAiLoading(false);
