@@ -658,6 +658,11 @@ fastify.get("/proxy", async (_request, reply) => {
   return reply.redirect(301, "/p");
 });
 
+fastify.get("/app/*", async (request, reply) => {
+  const appPath = request.params["*"] || "";
+  return reply.redirect(301, `/game/${appPath}`);
+});
+
 fastify.setNotFoundHandler((request, reply) => {
   const pathname = request.raw.url?.split("?")[0] ?? "/";
   const decodedPath = decodeURIComponent(pathname);
