@@ -104,11 +104,6 @@
             <span>Games</span>
         </a>
 
-        <a class="nav-item" onclick="showApps()">
-            <img src="/images/apps.png" alt="Apps">
-            <span>Apps</span>
-        </a>
-
         <a class="nav-item" onclick="showRequest()">
             <img src="/images/request.png" alt="Request/Report">
             <span>Request/Report</span>
@@ -293,7 +288,7 @@
                 <input type="text"
                     class="searchBar"
                     id="gamesSearchBar"
-                    placeholder="Search for a game...">
+                    placeholder="Search for a game or app...">
 
                 <button id="addGameBtn" type="button">Add</button>
 
@@ -494,22 +489,10 @@
                     <div class="gameTitle">Yohoho Io</div>
                 </div>
 
-            </div>
 
-        </div>
+                <!-- Former Apps page items -->
 
-        <!-- APPS -->
-
-        <div id="appsContent">
-
-            <input type="text"
-                class="searchBar"
-                id="appsSearchBar"
-                placeholder="Search for an app...">
-
-            <div class="linksContainer" id="appsLinksContainer">
-
-                <div class="gameCard" onclick="loadGame('/app/bgremover')">
+                <div class="gameCard" onclick="loadGame('/game/bgremover')">
                     <img src="/images/bgremover.png" alt="Background Remover">
                     <div class="gameTitle">Background Remover</div>
                 </div>
@@ -525,12 +508,12 @@
                 </div>
 
 
-                <div class="gameCard" onclick="loadGame('/app/elements')">
+                <div class="gameCard" onclick="loadGame('/search/https://ptable.com')">
                     <img src="/images/elements.png" alt="Elements">
                     <div class="gameTitle">Elements</div>
                 </div>
 
-                <div class="gameCard" onclick="loadGame('/app/fileconverter')">
+                <div class="gameCard" onclick="loadGame('/game/fileconverter')">
                     <img src="/images/fileconverter.png" alt="File Converter">
                     <div class="gameTitle">File Converter</div>
                 </div>
@@ -555,7 +538,7 @@
                     <div class="gameTitle">TCG Player</div>
                 </div>
 
-                <div class="gameCard" onclick="loadGame('/app/sandbox')">
+                <div class="gameCard" onclick="loadGame('/game/sandbox')">
                     <img src="/images/sandbox.png" alt="Sandbox">
                     <div class="gameTitle">Sandbox</div>
                 </div>
@@ -568,8 +551,6 @@
                 <div class="gameCard" onclick="loadGame('/search/https://youtube.com')">
                     <img src="/images/youtube.png" alt="Youtube" onerror="this.onerror=null;this.src='/images/webcrawler.png';">
                     <div class="gameTitle">Youtube</div>
-                </div>
-
                 </div>
 
             </div>
