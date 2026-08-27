@@ -95,8 +95,7 @@ function resolvePublicPath() {
 const publicPath = resolvePublicPath();
 
 const NEON_URL =
-  process.env.NEON_URL ||
-  "postgresql://neondb_owner:npg_0iwzSoTQnI7b@ep-little-water-aqlvgvbu-pooler.c-8.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require";
+  process.env.NEON_URL
 
 const SECRET_KEY =
   process.env.SECRET_KEY || "shadow-sites-plus-super-secret-key";
@@ -610,7 +609,7 @@ fastify.post("/ai/chat", async (request, reply) => {
           {
             role: "system",
             content:
-              "You are Tempest AI inside the Tempest site. Be smart, helpful, concise, and friendly. If the user asks for code, put every code sample in fenced Markdown code blocks with the language name so the site can show copy buttons. Give working code and explain exactly where it goes. Do not claim to do things outside this chat unless the site gives you a tool for it.",
+              "You are Unbreaking AI inside the Unbreaking site. The link to the site you are on is https://unbreakingone.onrender.com Be smart, helpful, concise, and friendly. You will help the user with whatever help they need. If the user asks for code, put every code sample in fenced Markdown code blocks with the language name so the site can show copy buttons. Give working code and explain exactly where it goes. Do not claim to do things outside this chat unless the site gives you a tool for it.",
           },
           ...messages,
         ],
@@ -622,18 +621,18 @@ fastify.post("/ai/chat", async (request, reply) => {
     const data = await groqResponse.json().catch(() => ({}));
     if (!groqResponse.ok) {
       return reply.code(groqResponse.status).send({
-        error: data?.error?.message || "Groq could not answer right now.",
+        error: data?.error?.message || "Unbreaking AI could not answer right now.",
       });
     }
 
     const replyText = data?.choices?.[0]?.message?.content?.trim();
     if (!replyText) {
-      return reply.code(502).send({ error: "Groq returned an empty answer." });
+      return reply.code(502).send({ error: "Unbreaking AI returned an empty answer." });
     }
 
     return reply.send({ reply: replyText, model: data?.model || GROQ_MODEL });
   } catch {
-    return reply.code(502).send({ error: "Could not reach Groq right now." });
+    return reply.code(502).send({ error: "Could not reach Unbreaking AI right now." });
   }
 });
 
