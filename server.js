@@ -273,16 +273,21 @@ fastify.post("/login", async (request, reply) => {
 
     if (!user) return reply.code(400).send({ error: "Invalid username or password" });
 
+    const valid = await bcrypt.compare(password, user.password);
+    if (!valid) return reply.code(400).send({ error: "Invalid username or password" });
+
     if (user.is_banned) {
-      return reply.code(403).send({ error: "You are banned." });
+      const banReason = (user.ban_reason || "").toString().trim() || "No reason provided";
+      return reply.code(403).send({
+        error: `You are banned. Reason: ${banReason}`,
+        banned: true,
+        banReason,
+      });
     }
 
     if (!user.is_approved) {
       return reply.code(403).send({ error: "Pending approval." });
     }
-
-    const valid = await bcrypt.compare(password, user.password);
-    if (!valid) return reply.code(400).send({ error: "Invalid username or password" });
 
     const token = jwt.sign({ id: user.id, role: user.role }, SECRET_KEY);
 
