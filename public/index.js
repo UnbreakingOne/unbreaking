@@ -705,17 +705,14 @@ document.addEventListener(
 	true
 );
 
-const startupInput = parseStartupInput();
-if (startupInput) {
-	if (!shouldShowStartupBar()) browserShell.classList.add("startup-direct");
-}
-
 createTab();
 activateTab(tabs[0].id);
 updateNavState();
 startUrlSyncInterval();
 
+const startupInput = parseStartupInput();
 if (startupInput) {
+	if (!shouldShowStartupBar()) browserShell.classList.add("startup-direct");
 	homeSearchInput.value = startupInput;
 	address.value = /^https?:\/\//i.test(startupInput)
 		? normalizeDisplayUrl(startupInput)
