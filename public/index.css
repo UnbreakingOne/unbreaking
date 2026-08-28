@@ -294,9 +294,6 @@ input, button, textarea, select {
   display: flex;
 }
 
-.startup-direct-pending .landing.active,
-.browser-shell.startup-direct .landing.active {
-  display: none;
 .tab-frame.is-loading {
   opacity: 0;
 }
