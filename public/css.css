@@ -441,6 +441,7 @@ img {
 
 
 #gamesContent,
+#appsContent,
 #requestContent,
 #adminDashboard,
 #proxyContent {
@@ -616,25 +617,6 @@ img {
   max-width: 1000px;
   margin: 0 auto;
   padding: 0 20px;
-}
-
-.linksSectionLabel {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  color: #c8a8f0;
-  font-size: 1.4rem;
-  font-weight: bold;
-  text-shadow: 0 0 10px var(--glow-color);
-}
-
-.linksSectionLabel img {
-  width: 42px;
-  height: 42px;
-  border-radius: 10px;
-  object-fit: cover;
-  box-shadow: 0 0 10px var(--glow-color);
 }
 
 .gameCard {
@@ -1184,18 +1166,21 @@ img {
 }
 
 #gamesContent::-webkit-scrollbar,
+#appsContent::-webkit-scrollbar,
 #requestContent::-webkit-scrollbar,
 #adminDashboard::-webkit-scrollbar {
   width: 8px;
 }
 
 #gamesContent::-webkit-scrollbar-track,
+#appsContent::-webkit-scrollbar-track,
 #requestContent::-webkit-scrollbar-track,
 #adminDashboard::-webkit-scrollbar-track {
   background: var(--dark-blue-bg);
 }
 
 #gamesContent::-webkit-scrollbar-thumb,
+#appsContent::-webkit-scrollbar-thumb,
 #requestContent::-webkit-scrollbar-thumb,
 #adminDashboard::-webkit-scrollbar-thumb {
   background: var(--glow-color);
