@@ -170,6 +170,12 @@
             checkLoginStatus();
 
             window.handleGoogleCredential = async function ({ credential }) {
+                const username = document.getElementById('googleUsername').value.trim();
+                if (!username) {
+                    authMessage.innerText = "Choose a username before signing in with Google.";
+                    authMessage.style.color = "#ff4d4d";
+                    return;
+                }
                 authMessage.innerText = "Authenticating...";
                 authMessage.style.color = "#d580ff";
 
@@ -178,6 +184,7 @@
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ credential })
+                        body: JSON.stringify({ credential, username })
                     });
                     const data = await response.json();
 

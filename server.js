@@ -294,6 +294,27 @@ fastify.post("/auth/google", async (request, reply) => {
 
   if (!credential) {
     return reply.code(400).send({ error: "Google sign-in is required." });
+
+  if (!response.ok) throw new Error("Google token verification failed");
+
+  const payload = await response.json();
+  if (
+    payload.aud !== GOOGLE_CLIENT_ID ||
+    payload.email_verified !== "true" ||
+    !["accounts.google.com", "https://accounts.google.com"].includes(payload.iss)
+  ) {
+    throw new Error("Invalid Google token");
+  }
+
+  return payload;
+}
+
+fastify.post("/auth/google", async (request, reply) => {
+  const { credential, username: requestedUsername } = request.body ?? {};
+  const username = typeof requestedUsername === "string" ? requestedUsername.trim() : "";
+
+  if (!credential || !username || username.length > 255) {
+    return reply.code(400).send({ error: "A username and Google sign-in are required." });
   }
 
   try {
@@ -325,12 +346,17 @@ fastify.post("/auth/google", async (request, reply) => {
       );
       user.username = username;
       if (admin) user.role = "admin";
+        "UPDATE users SET google_subject = $1, is_approved = true, is_online = true, last_seen = $2 WHERE id = $3",
+        [googleUser.sub, Date.now(), user.id]
+      );
     } else {
       const placeholderPassword = await bcrypt.hash(crypto.randomUUID(), 10);
       const created = await pool.query(
         `INSERT INTO users (username, email, password, google_subject, role, is_approved, is_online, last_seen)
          VALUES ($1, $2, $3, $4, $5, true, true, $6) RETURNING *`,
         [username, googleUser.email, placeholderPassword, googleUser.sub, admin ? "admin" : "user", Date.now()]
+         VALUES ($1, $2, $3, $4, 'user', true, true, $5) RETURNING *`,
+        [username, googleUser.email, placeholderPassword, googleUser.sub, Date.now()]
       );
       user = created.rows[0];
     }
