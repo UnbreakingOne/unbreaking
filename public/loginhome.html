@@ -9,6 +9,7 @@
     <link rel="icon" href="/images/google.png" type="image/x-icon">
     <link rel="stylesheet" href="/css.css">
     <link rel="stylesheet" href="/proxy-fix.css">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 
 <body>
@@ -24,20 +25,9 @@
 
             <div id="authMessage"></div>
 
-            <form id="loginForm">
-                <input type="text" id="loginUser" class="authInput" placeholder="Username" required>
-                <input type="password" id="loginPass" class="authInput" placeholder="Password" required>
-                <button type="submit" class="authBtn">Log In</button>
-            </form>
-
-            <form id="signupForm" style="display:none;">
-                <input type="text" id="signupUser" class="authInput" placeholder="New Username" required>
-                <input type="email" id="signupEmail" class="authInput" placeholder="Email Address" required>
-                <input type="password" id="signupPass" class="authInput" placeholder="New Password" required>
-                <button type="submit" class="authBtn">Create Account</button>
-            </form>
-
-            <div id="toggleAuthBtn" class="toggleAuth">Sign Up</div>
+            <p class="authHelp">Choose the username you want to use, then sign in with Google.</p>
+            <input type="text" id="googleUsername" class="authInput" placeholder="Username" maxlength="255" required>
+            <div id="googleSignInButton" class="googleSignInButton"></div>
 
         </div>
     </div>

@@ -972,6 +972,19 @@ img {
   min-height: 20px;
 }
 
+.authHelp {
+  color: #c8a8f0;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  margin: 0 0 18px;
+}
+
+.googleSignInButton {
+  display: flex;
+  justify-content: center;
+  min-height: 44px;
+}
+
 .authInput {
   width: 90%;
   padding: 12px;
