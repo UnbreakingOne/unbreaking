@@ -71,10 +71,12 @@ const scramjetPath = resolveExistingPath(
   getPathExport(scramjetPathModule),
   resolvePackageDist("@mercuryworkshop/scramjet/path")
 );
+
 const libcurlPath = resolveExistingPath(
   importedLibcurlPath,
   resolvePackageDist("@mercuryworkshop/libcurl-transport")
 );
+
 const baremuxPath = resolveExistingPath(
   importedBaremuxPath,
   resolvePackageDist("@mercuryworkshop/bare-mux/node")
