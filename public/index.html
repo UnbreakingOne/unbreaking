@@ -1,1 +1,28 @@
-Not Found
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>unbreakingone.onrender.com</title>
+</head>
+<body>
+    Not Found
+
+    <script>
+        document.addEventListener("keydown", function (event) {
+            if (event.shiftKey && event.key.toLowerCase() === "u") {
+                const win = window.open("about:blank", "_blank");
+
+                if (win) {
+                    win.document.open();
+                    win.document.write(`
+                    <title>Google</title>
+                    <link rel="icon" href="/images/google.png" type="image/x-icon">
+<iframe srcdoc='<iframe src="https://unbreakingone.onrender.com/loginhome" style="position:fixed;top:0;left:0;width:100vw;height:100vh;border:0;"></iframe>' style="position:fixed;top:0;left:0;width:100vw;height:100vh;border:0;"></iframe>
+                    `);
+                    win.document.close();
+                }
+            }
+        });
+    </script>
+</body>
+</html>
