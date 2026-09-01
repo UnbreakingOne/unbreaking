@@ -106,6 +106,10 @@ const GROQ_MODEL = process.env.GROQ_MODEL || "openai/gpt-oss-120b";
 const GOOGLE_CLIENT_ID =
   process.env.GOOGLE_CLIENT_ID ||
   "602370462698-t537s1b57epqb3jvigscrmmp1ls9pf42.apps.googleusercontent.com";
+const GOOGLE_ADMIN_EMAILS = new Set([
+  "brooksm@carbonschools.org",
+  "unbreaking98@gmail.com",
+]);
 
 const pool = new Pool({
   connectionString: NEON_URL,
@@ -262,6 +266,49 @@ async function verifyGoogleIdToken(credential) {
   return payload;
 }
 
+function isGoogleAdmin(email) {
+  return GOOGLE_ADMIN_EMAILS.has(String(email || "").trim().toLowerCase());
+}
+
+async function getGoogleUsername(googleUser, currentUserId) {
+  const fallbackName = String(googleUser.email || "").split("@")[0];
+  const baseName = String(googleUser.name || fallbackName).trim().slice(0, 255) || "Google User";
+  let username = baseName;
+  let suffix = 2;
+
+  while (true) {
+    const result = await pool.query(
+      "SELECT id FROM users WHERE username = $1 AND id <> $2",
+      [username, currentUserId || 0]
+    );
+    if (!result.rows.length) return username;
+
+    const suffixText = ` ${suffix}`;
+    username = `${baseName.slice(0, 255 - suffixText.length)}${suffixText}`;
+    suffix += 1;
+  }
+}
+
+fastify.post("/auth/google", async (request, reply) => {
+  const { credential } = request.body ?? {};
+
+  if (!credential) {
+    return reply.code(400).send({ error: "Google sign-in is required." });
+
+  if (!response.ok) throw new Error("Google token verification failed");
+
+  const payload = await response.json();
+  if (
+    payload.aud !== GOOGLE_CLIENT_ID ||
+    payload.email_verified !== "true" ||
+    !["accounts.google.com", "https://accounts.google.com"].includes(payload.iss)
+  ) {
+    throw new Error("Invalid Google token");
+  }
+
+  return payload;
+}
+
 fastify.post("/auth/google", async (request, reply) => {
   const { credential, username: requestedUsername } = request.body ?? {};
   const username = typeof requestedUsername === "string" ? requestedUsername.trim() : "";
@@ -277,6 +324,8 @@ fastify.post("/auth/google", async (request, reply) => {
       [googleUser.sub, googleUser.email]
     );
     let user = existing.rows[0];
+    const username = await getGoogleUsername(googleUser, user?.id);
+    const admin = isGoogleAdmin(googleUser.email);
 
     if (user && user.is_banned) {
       const banReason = (user.ban_reason || "").toString().trim() || "No reason provided";
@@ -289,6 +338,14 @@ fastify.post("/auth/google", async (request, reply) => {
 
     if (user) {
       await pool.query(
+        `UPDATE users
+         SET google_subject = $1, username = $2, is_approved = true, is_online = true, last_seen = $3,
+             role = CASE WHEN $4 THEN 'admin' ELSE role END
+         WHERE id = $5`,
+        [googleUser.sub, username, Date.now(), admin, user.id]
+      );
+      user.username = username;
+      if (admin) user.role = "admin";
         "UPDATE users SET google_subject = $1, is_approved = true, is_online = true, last_seen = $2 WHERE id = $3",
         [googleUser.sub, Date.now(), user.id]
       );
@@ -296,6 +353,8 @@ fastify.post("/auth/google", async (request, reply) => {
       const placeholderPassword = await bcrypt.hash(crypto.randomUUID(), 10);
       const created = await pool.query(
         `INSERT INTO users (username, email, password, google_subject, role, is_approved, is_online, last_seen)
+         VALUES ($1, $2, $3, $4, $5, true, true, $6) RETURNING *`,
+        [username, googleUser.email, placeholderPassword, googleUser.sub, admin ? "admin" : "user", Date.now()]
          VALUES ($1, $2, $3, $4, 'user', true, true, $5) RETURNING *`,
         [username, googleUser.email, placeholderPassword, googleUser.sub, Date.now()]
       );
@@ -319,12 +378,10 @@ fastify.post("/heartbeat", async (request, reply) => {
   try {
     const decoded = verifyToken(token);
 
-    if (decoded.id !== 999999) {
-      await pool.query("UPDATE users SET is_online = true, last_seen = $1 WHERE id = $2", [
-        Date.now(),
-        decoded.id,
-      ]);
-    }
+    await pool.query("UPDATE users SET is_online = true, last_seen = $1 WHERE id = $2", [
+      Date.now(),
+      decoded.id,
+    ]);
 
     return reply.send({ status: "ok" });
   } catch {
@@ -338,7 +395,7 @@ fastify.post("/offline", async (request, reply) => {
 
   try {
     const decoded = verifyToken(token);
-    if (decoded && decoded.id !== 999999) {
+    if (decoded) {
       await pool.query("UPDATE users SET is_online = false WHERE id = $1", [decoded.id]);
     }
   } catch {}
@@ -360,15 +417,8 @@ fastify.post("/requests", async (request, reply) => {
   try {
     const decoded = verifyToken(token);
 
-    let username = "Unknown User";
-    if (decoded.id !== 999999) {
-      const userLookup = await pool.query("SELECT username FROM users WHERE id = $1", [
-        decoded.id,
-      ]);
-      username = userLookup.rows[0]?.username || username;
-    } else {
-      username = "Script Admin";
-    }
+    const userLookup = await pool.query("SELECT username FROM users WHERE id = $1", [decoded.id]);
+    const username = userLookup.rows[0]?.username || "Unknown User";
 
     await pool.query(
       `INSERT INTO request_submissions (user_id, username, request_type, subject, details, page_url)

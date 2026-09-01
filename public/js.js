@@ -183,6 +183,7 @@
                     const response = await fetch('/auth/google', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ credential })
                         body: JSON.stringify({ credential, username })
                     });
                     const data = await response.json();
@@ -190,7 +191,7 @@
                     if (data.token) {
                         localStorage.setItem('token', data.token);
                         localStorage.setItem('role', data.role);
-                        localStorage.setItem('username', data.username || username);
+                        localStorage.setItem('username', data.username || 'Account');
                         authMessage.innerText = "Access Granted.";
                         authMessage.style.color = "#28a745";
                         setTimeout(checkLoginStatus, 500);
@@ -605,13 +606,23 @@
 
                 if (actions.children.length) card.appendChild(actions);
 
-                if (isOwned) {
-                    gamesLinksContainer.prepend(card);
-                } else {
-                    gamesLinksContainer.appendChild(card);
-                }
+                gamesLinksContainer.appendChild(card);
+                sortGameCards();
                 return card;
             }
+
+            function sortGameCards() {
+                const cards = Array.from(gamesLinksContainer.querySelectorAll(':scope > .gameCard'));
+                const collator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
+                cards.sort((first, second) => {
+                    const firstName = first.querySelector('.gameTitle')?.textContent?.trim() || '';
+                    const secondName = second.querySelector('.gameTitle')?.textContent?.trim() || '';
+                    return collator.compare(firstName, secondName);
+                });
+                cards.forEach((card) => gamesLinksContainer.appendChild(card));
+            }
+
+            sortGameCards();
 
             function clearRenderedCustomGames() {
                 const rendered = gamesLinksContainer.querySelectorAll('[data-custom-game="1"]');
