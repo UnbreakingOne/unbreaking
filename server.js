@@ -20,6 +20,7 @@ const require = createRequire(import.meta.url);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const port = process.env.PORT || 4000;
+const SESSION_DURATION_MS = 24 * 60 * 60 * 1000;
 
 function getPathExport(moduleValue) {
   if (typeof moduleValue === "string") return moduleValue;
@@ -174,7 +175,9 @@ try {
       is_banned BOOLEAN DEFAULT false,
       ban_reason TEXT DEFAULT '',
       last_seen BIGINT DEFAULT 0,
-      is_online BOOLEAN DEFAULT false
+      is_online BOOLEAN DEFAULT false,
+      session_expires_at BIGINT DEFAULT 0,
+      reauth_required BOOLEAN DEFAULT false
     );
   `);
 
@@ -212,6 +215,14 @@ try {
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS google_subject VARCHAR(255) UNIQUE"
   );
 
+  await pool.query(
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS session_expires_at BIGINT DEFAULT 0"
+  );
+
+  await pool.query(
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS reauth_required BOOLEAN DEFAULT false"
+  );
+
   console.log("Connected to Neon DB!");
 } catch (err) {
   console.error("DATABASE ERROR:", err);
@@ -221,8 +232,11 @@ setInterval(async () => {
   const cutoff = Date.now() - 15000;
   try {
     await pool.query(
-      "UPDATE users SET is_online = false WHERE last_seen < $1 AND is_online = true",
-      [cutoff]
+      `UPDATE users
+       SET is_online = false,
+           reauth_required = CASE WHEN session_expires_at <= $2 THEN true ELSE reauth_required END
+       WHERE last_seen < $1 AND is_online = true`,
+      [cutoff, Date.now()]
     );
   } catch {}
 }, 5000);
@@ -235,12 +249,31 @@ function verifyToken(token) {
   return jwt.verify(token, SECRET_KEY, { ignoreExpiration: true });
 }
 
+async function verifyActiveToken(token) {
+  const decoded = verifyToken(token);
+  const result = await pool.query(
+    "SELECT is_online, session_expires_at, reauth_required FROM users WHERE id = $1",
+    [decoded.id]
+  );
+  const user = result.rows[0];
+
+  if (!user) throw new Error("User not found");
+  if (user.reauth_required) throw new Error("Reauthentication required");
+
+  if (Number(user.session_expires_at) <= Date.now() && !user.is_online) {
+    await pool.query("UPDATE users SET reauth_required = true WHERE id = $1", [decoded.id]);
+    throw new Error("Reauthentication required");
+  }
+
+  return decoded;
+}
+
 async function verifyAdmin(request, reply) {
   const token = getBearerToken(request);
   if (!token) return reply.code(401).send({ error: "Unauthorized" });
 
   try {
-    const decoded = verifyToken(token);
+    const decoded = await verifyActiveToken(token);
     if (decoded.role !== "admin") {
       return reply.code(403).send({ error: "Forbidden" });
     }
@@ -317,22 +350,25 @@ fastify.post("/auth/google", async (request, reply) => {
       });
     }
 
+    const sessionExpiresAt = Date.now() + SESSION_DURATION_MS;
+
     if (user) {
       await pool.query(
         `UPDATE users
          SET google_subject = $1, username = $2, is_approved = true, is_online = true, last_seen = $3,
-             role = CASE WHEN $4 THEN 'admin' ELSE role END
-         WHERE id = $5`,
-        [googleUser.sub, username, Date.now(), admin, user.id]
+             session_expires_at = $4, reauth_required = false,
+             role = CASE WHEN $5 THEN 'admin' ELSE role END
+         WHERE id = $6`,
+        [googleUser.sub, username, Date.now(), sessionExpiresAt, admin, user.id]
       );
       user.username = username;
       if (admin) user.role = "admin";
     } else {
       const placeholderPassword = await bcrypt.hash(crypto.randomUUID(), 10);
       const created = await pool.query(
-        `INSERT INTO users (username, email, password, google_subject, role, is_approved, is_online, last_seen)
-         VALUES ($1, $2, $3, $4, $5, true, true, $6) RETURNING *`,
-        [username, googleUser.email, placeholderPassword, googleUser.sub, admin ? "admin" : "user", Date.now()]
+        `INSERT INTO users (username, email, password, google_subject, role, is_approved, is_online, last_seen, session_expires_at, reauth_required)
+         VALUES ($1, $2, $3, $4, $5, true, true, $6, $7, false) RETURNING *`,
+        [username, googleUser.email, placeholderPassword, googleUser.sub, admin ? "admin" : "user", Date.now(), sessionExpiresAt]
       );
       user = created.rows[0];
     }
@@ -352,7 +388,7 @@ fastify.post("/heartbeat", async (request, reply) => {
   if (!token) return reply.code(401).send({ error: "No token" });
 
   try {
-    const decoded = verifyToken(token);
+    const decoded = await verifyActiveToken(token);
 
     await pool.query("UPDATE users SET is_online = true, last_seen = $1 WHERE id = $2", [
       Date.now(),
@@ -372,7 +408,13 @@ fastify.post("/offline", async (request, reply) => {
   try {
     const decoded = verifyToken(token);
     if (decoded) {
-      await pool.query("UPDATE users SET is_online = false WHERE id = $1", [decoded.id]);
+      await pool.query(
+        `UPDATE users
+         SET is_online = false,
+             reauth_required = CASE WHEN session_expires_at <= $1 THEN true ELSE reauth_required END
+         WHERE id = $2`,
+        [Date.now(), decoded.id]
+      );
     }
   } catch {}
 
@@ -391,7 +433,7 @@ fastify.post("/requests", async (request, reply) => {
   }
 
   try {
-    const decoded = verifyToken(token);
+    const decoded = await verifyActiveToken(token);
 
     const userLookup = await pool.query("SELECT username FROM users WHERE id = $1", [decoded.id]);
     const username = userLookup.rows[0]?.username || "Unknown User";
@@ -413,7 +455,7 @@ fastify.get("/custom-games", async (request, reply) => {
   if (!token) return reply.code(401).send({ error: "Unauthorized" });
 
   try {
-    const decoded = verifyToken(token);
+    const decoded = await verifyActiveToken(token);
     const result = await pool.query(
       `SELECT id, name, game_type, target_url, html_code, icon_data, is_published
        FROM custom_games
@@ -447,7 +489,7 @@ fastify.post("/custom-games", async (request, reply) => {
   }
 
   try {
-    const decoded = verifyToken(token);
+    const decoded = await verifyActiveToken(token);
 
     await pool.query("DELETE FROM custom_games WHERE user_id = $1", [decoded.id]);
 
@@ -613,7 +655,7 @@ fastify.post("/ai/chat", async (request, reply) => {
   if (!token) return reply.code(401).send({ error: "Please log in to use Tempest AI." });
 
   try {
-    verifyToken(token);
+    await verifyActiveToken(token);
   } catch {
     return reply.code(401).send({ error: "Please log in again to use Tempest AI." });
   }
