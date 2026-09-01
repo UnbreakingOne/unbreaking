@@ -3,6 +3,7 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "url";
 import path from "path";
 import fs from "fs";
+import crypto from "node:crypto";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import pkg from "pg";
@@ -102,6 +103,9 @@ const SECRET_KEY =
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY || "";
 const GROQ_MODEL = process.env.GROQ_MODEL || "openai/gpt-oss-120b";
+const GOOGLE_CLIENT_ID =
+  process.env.GOOGLE_CLIENT_ID ||
+  "602370462698-t537s1b57epqb3jvigscrmmp1ls9pf42.apps.googleusercontent.com";
 
 const pool = new Pool({
   connectionString: NEON_URL,
@@ -160,7 +164,7 @@ try {
       email VARCHAR(255) UNIQUE NOT NULL,
       password VARCHAR(255) NOT NULL,
       role VARCHAR(50) DEFAULT 'user',
-      is_approved BOOLEAN DEFAULT false,
+      is_approved BOOLEAN DEFAULT true,
       is_banned BOOLEAN DEFAULT false,
       ban_reason TEXT DEFAULT '',
       last_seen BIGINT DEFAULT 0,
@@ -196,6 +200,10 @@ try {
 
   await pool.query(
     "ALTER TABLE custom_games ADD COLUMN IF NOT EXISTS is_published BOOLEAN DEFAULT false"
+  );
+
+  await pool.query(
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS google_subject VARCHAR(255) UNIQUE"
   );
 
   console.log("Connected to Neon DB!");
@@ -235,47 +243,42 @@ async function verifyAdmin(request, reply) {
   }
 }
 
-fastify.post("/signup", async (request, reply) => {
-  const { username, email, password } = request.body ?? {};
-  if (!username || !email || !password) {
-    return reply.code(400).send({ error: "All fields required" });
+async function verifyGoogleIdToken(credential) {
+  const response = await fetch(
+    `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`
+  );
+
+  if (!response.ok) throw new Error("Google token verification failed");
+
+  const payload = await response.json();
+  if (
+    payload.aud !== GOOGLE_CLIENT_ID ||
+    payload.email_verified !== "true" ||
+    !["accounts.google.com", "https://accounts.google.com"].includes(payload.iss)
+  ) {
+    throw new Error("Invalid Google token");
+  }
+
+  return payload;
+}
+
+fastify.post("/auth/google", async (request, reply) => {
+  const { credential, username: requestedUsername } = request.body ?? {};
+  const username = typeof requestedUsername === "string" ? requestedUsername.trim() : "";
+
+  if (!credential || !username || username.length > 255) {
+    return reply.code(400).send({ error: "A username and Google sign-in are required." });
   }
 
   try {
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    await pool.query(
-      "INSERT INTO users (username, email, password, role, is_approved) VALUES ($1, $2, $3, 'user', false)",
-      [username, email, hashedPassword]
+    const googleUser = await verifyGoogleIdToken(credential);
+    const existing = await pool.query(
+      "SELECT * FROM users WHERE google_subject = $1 OR email = $2 ORDER BY google_subject = $1 DESC LIMIT 1",
+      [googleUser.sub, googleUser.email]
     );
+    let user = existing.rows[0];
 
-    return reply.send({ message: "Account created! Waiting for admin approval." });
-  } catch (err) {
-    if (err.code === "23505") {
-      return reply.code(400).send({ error: "Username or email already exists." });
-    }
-    return reply.code(500).send({ error: "Server error" });
-  }
-});
-
-fastify.post("/login", async (request, reply) => {
-  const { username, password } = request.body ?? {};
-
-  if (username === "script.user" && password === "script.password") {
-    const token = jwt.sign({ id: 999999, role: "admin" }, SECRET_KEY);
-    return reply.send({ token, role: "admin", username: "Script Admin" });
-  }
-
-  try {
-    const result = await pool.query("SELECT * FROM users WHERE username = $1", [username]);
-    const user = result.rows[0];
-
-    if (!user) return reply.code(400).send({ error: "Invalid username or password" });
-
-    const valid = await bcrypt.compare(password, user.password);
-    if (!valid) return reply.code(400).send({ error: "Invalid username or password" });
-
-    if (user.is_banned) {
+    if (user && user.is_banned) {
       const banReason = (user.ban_reason || "").toString().trim() || "No reason provided";
       return reply.code(403).send({
         error: `You are banned. Reason: ${banReason}`,
@@ -284,20 +287,28 @@ fastify.post("/login", async (request, reply) => {
       });
     }
 
-    if (!user.is_approved) {
-      return reply.code(403).send({ error: "Pending approval." });
+    if (user) {
+      await pool.query(
+        "UPDATE users SET google_subject = $1, is_approved = true, is_online = true, last_seen = $2 WHERE id = $3",
+        [googleUser.sub, Date.now(), user.id]
+      );
+    } else {
+      const placeholderPassword = await bcrypt.hash(crypto.randomUUID(), 10);
+      const created = await pool.query(
+        `INSERT INTO users (username, email, password, google_subject, role, is_approved, is_online, last_seen)
+         VALUES ($1, $2, $3, $4, 'user', true, true, $5) RETURNING *`,
+        [username, googleUser.email, placeholderPassword, googleUser.sub, Date.now()]
+      );
+      user = created.rows[0];
     }
 
     const token = jwt.sign({ id: user.id, role: user.role }, SECRET_KEY);
-
-    await pool.query("UPDATE users SET is_online = true, last_seen = $1 WHERE id = $2", [
-      Date.now(),
-      user.id,
-    ]);
-
     return reply.send({ token, role: user.role, username: user.username });
-  } catch {
-    return reply.code(500).send({ error: "Server error" });
+  } catch (err) {
+    if (err.code === "23505") {
+      return reply.code(400).send({ error: "That username is already in use." });
+    }
+    return reply.code(401).send({ error: "Google sign-in could not be verified." });
   }
 });
 
@@ -489,10 +500,6 @@ fastify.post("/admin/action", { preHandler: verifyAdmin }, async (request, reply
   const { userId, action, reason } = request.body ?? {};
 
   try {
-    if (action === "approve") {
-      await pool.query("UPDATE users SET is_approved = true WHERE id = $1", [userId]);
-    }
-
     if (action === "ban") {
       const safeReason = (reason || "").toString().trim() || "No reason provided";
       await pool.query(
@@ -677,8 +684,7 @@ fastify.setNotFoundHandler((request, reply) => {
 
   if (
     pathname.startsWith("/admin/") ||
-    pathname === "/signup" ||
-    pathname === "/login" ||
+    pathname === "/auth/google" ||
     pathname === "/heartbeat" ||
     pathname === "/offline" ||
     pathname === "/requests" ||
