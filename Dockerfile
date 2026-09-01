@@ -21,5 +21,8 @@ RUN if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit
 # Copy app source
 COPY . .
 
+# Fail the build before deployment if the server cannot be parsed by Node.
+RUN node --check server.js
+
 ENTRYPOINT [ "node" ]
 CMD ["server.js"]

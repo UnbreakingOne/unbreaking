@@ -1,9 +1,5 @@
         (function () {
             const authOverlay = document.getElementById('authOverlay');
-            const loginForm = document.getElementById('loginForm');
-            const signupForm = document.getElementById('signupForm');
-            const toggleAuthBtn = document.getElementById('toggleAuthBtn');
-            const authTitle = document.getElementById('authTitle');
             const authMessage = document.getElementById('authMessage');
             const sspModalOverlay = document.getElementById('sspModalOverlay');
             const sspModalTitle = document.getElementById('sspModalTitle');
@@ -61,7 +57,6 @@
             const addGameHtmlWrap = document.getElementById('addGameHtmlWrap');
             const addGameSubmitBtn = addGameForm.querySelector('button[type="submit"]');
 
-            let isLoginMode = true;
             let heartbeatInterval;
             let activeModalResolve = null;
             let adminUsersCache = [];
@@ -174,42 +169,22 @@
             }
             checkLoginStatus();
 
-            toggleAuthBtn.addEventListener('click', () => {
-                isLoginMode = !isLoginMode;
-                authMessage.innerText = "";
-                authMessage.style.color = "#d580ff";
-                if (isLoginMode) {
-                    loginForm.style.display = 'block';
-                    signupForm.style.display = 'none';
-                    authTitle.innerText = 'Log In to Tempest';
-                    toggleAuthBtn.innerText = 'Need an account? Sign Up';
-                } else {
-                    loginForm.style.display = 'none';
-                    signupForm.style.display = 'block';
-                    authTitle.innerText = 'Create Tempest Account';
-                    toggleAuthBtn.innerText = 'Already have an account? Log In';
-                }
-            });
-
-            loginForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const username = document.getElementById('loginUser').value;
-                const password = document.getElementById('loginPass').value;
+            window.handleGoogleCredential = async function ({ credential }) {
                 authMessage.innerText = "Authenticating...";
                 authMessage.style.color = "#d580ff";
 
                 try {
-                    const response = await fetch('/login', {
+                    const response = await fetch('/auth/google', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ username, password })
+                        body: JSON.stringify({ credential })
                     });
                     const data = await response.json();
 
                     if (data.token) {
                         localStorage.setItem('token', data.token);
                         localStorage.setItem('role', data.role);
-                        localStorage.setItem('username', data.username || username);
+                        localStorage.setItem('username', data.username || 'Account');
                         authMessage.innerText = "Access Granted.";
                         authMessage.style.color = "#28a745";
                         setTimeout(checkLoginStatus, 500);
@@ -233,37 +208,20 @@
                     authMessage.innerText = "Server error. Try again later.";
                     authMessage.style.color = "#ff4d4d";
                 }
-            });
+            };
 
-            signupForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const username = document.getElementById('signupUser').value;
-                const email = document.getElementById('signupEmail').value;
-                const password = document.getElementById('signupPass').value;
-                authMessage.innerText = "Registering...";
-                authMessage.style.color = "#d580ff";
-
-                try {
-                    const response = await fetch('/signup', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ username, email, password })
-                    });
-                    const data = await response.json();
-
-                    if (response.ok) {
-                        authMessage.innerText = data.message;
-                        authMessage.style.color = "#28a745";
-                        setTimeout(() => toggleAuthBtn.click(), 2500);
-                    } else {
-                        authMessage.innerText = data.error;
-                        authMessage.style.color = "#ff4d4d";
-                    }
-                } catch (_) {
-                    authMessage.innerText = "Server error. Try again later.";
-                    authMessage.style.color = "#ff4d4d";
-                }
-            });
+            function renderGoogleSignInButton() {
+                if (!window.google?.accounts?.id) return setTimeout(renderGoogleSignInButton, 100);
+                google.accounts.id.initialize({
+                    client_id: '602370462698-t537s1b57epqb3jvigscrmmp1ls9pf42.apps.googleusercontent.com',
+                    callback: window.handleGoogleCredential,
+                    auto_select: false
+                });
+                google.accounts.id.renderButton(document.getElementById('googleSignInButton'), {
+                    theme: 'outline', size: 'large', text: 'signin_with', width: 280
+                });
+            }
+            renderGoogleSignInButton();
 
             function forceLogout(msg) {
                 localStorage.removeItem('token');
@@ -320,13 +278,12 @@
                         return u.includes(searchText) || e.includes(searchText);
                     })
                     .forEach(user => {
-                        const statusText = user.is_banned ? 'BANNED' : (user.is_approved ? 'Approved' : 'Pending');
+                        const statusText = user.is_banned ? 'BANNED' : 'Active';
                         const onlineBadge = user.is_online
                             ? `<span class="statusBadge online">Online</span>`
                             : `<span class="statusBadge offline">Offline</span>`;
 
                         let actionButtons = '';
-                        if (!user.is_approved) actionButtons += `<button class="adminActionBtn btn-approve" onclick="adminAction(${user.id}, 'approve')">Approve</button>`;
                         if (!user.is_banned) actionButtons += `<button class="adminActionBtn btn-ban" onclick="adminAction(${user.id}, 'ban')">Ban</button>`;
                         if (user.is_banned) actionButtons += `<button class="adminActionBtn btn-unban" onclick="adminAction(${user.id}, 'unban')">Unban</button>`;
 
@@ -642,13 +599,23 @@
 
                 if (actions.children.length) card.appendChild(actions);
 
-                if (isOwned) {
-                    gamesLinksContainer.prepend(card);
-                } else {
-                    gamesLinksContainer.appendChild(card);
-                }
+                gamesLinksContainer.appendChild(card);
+                sortGameCards();
                 return card;
             }
+
+            function sortGameCards() {
+                const cards = Array.from(gamesLinksContainer.querySelectorAll(':scope > .gameCard'));
+                const collator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
+                cards.sort((first, second) => {
+                    const firstName = first.querySelector('.gameTitle')?.textContent?.trim() || '';
+                    const secondName = second.querySelector('.gameTitle')?.textContent?.trim() || '';
+                    return collator.compare(firstName, secondName);
+                });
+                cards.forEach((card) => gamesLinksContainer.appendChild(card));
+            }
+
+            sortGameCards();
 
             function clearRenderedCustomGames() {
                 const rendered = gamesLinksContainer.querySelectorAll('[data-custom-game="1"]');
