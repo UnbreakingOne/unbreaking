@@ -99,16 +99,18 @@ function resolvePublicPath() {
 const publicPath = resolvePublicPath();
 
 const NEON_URL =
-  process.env.NEON_URL
+  process.env.NEON_URL;
 
 const SECRET_KEY =
   process.env.SECRET_KEY || "shadow-sites-plus-super-secret-key";
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY || "";
 const GROQ_MODEL = process.env.GROQ_MODEL || "openai/gpt-oss-120b";
+
 const GOOGLE_CLIENT_ID =
   process.env.GOOGLE_CLIENT_ID ||
   "602370462698-t537s1b57epqb3jvigscrmmp1ls9pf42.apps.googleusercontent.com";
+
 const GOOGLE_ADMIN_EMAILS = new Set([
   "brooksm@carbonschools.org",
   "unbreaking98@gmail.com",
@@ -120,6 +122,7 @@ const pool = new Pool({
 });
 
 logging.set_level(logging.NONE);
+
 Object.assign(wisp.options, {
   allow_udp_streams: false,
   hostname_blacklist: [/example\.com/],
@@ -230,6 +233,7 @@ try {
 
 setInterval(async () => {
   const cutoff = Date.now() - 15000;
+
   try {
     await pool.query(
       `UPDATE users
@@ -251,17 +255,26 @@ function verifyToken(token) {
 
 async function verifyActiveToken(token) {
   const decoded = verifyToken(token);
+
   const result = await pool.query(
     "SELECT is_online, session_expires_at, reauth_required FROM users WHERE id = $1",
     [decoded.id]
   );
+
   const user = result.rows[0];
 
   if (!user) throw new Error("User not found");
-  if (user.reauth_required) throw new Error("Reauthentication required");
+
+  if (user.reauth_required) {
+    throw new Error("Reauthentication required");
+  }
 
   if (Number(user.session_expires_at) <= Date.now() && !user.is_online) {
-    await pool.query("UPDATE users SET reauth_required = true WHERE id = $1", [decoded.id]);
+    await pool.query(
+      "UPDATE users SET reauth_required = true WHERE id = $1",
+      [decoded.id]
+    );
+
     throw new Error("Reauthentication required");
   }
 
@@ -270,10 +283,14 @@ async function verifyActiveToken(token) {
 
 async function verifyAdmin(request, reply) {
   const token = getBearerToken(request);
-  if (!token) return reply.code(401).send({ error: "Unauthorized" });
+
+  if (!token) {
+    return reply.code(401).send({ error: "Unauthorized" });
+  }
 
   try {
     const decoded = await verifyActiveToken(token);
+
     if (decoded.role !== "admin") {
       return reply.code(403).send({ error: "Forbidden" });
     }
@@ -287,9 +304,12 @@ async function verifyGoogleIdToken(credential) {
     `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`
   );
 
-  if (!response.ok) throw new Error("Google token verification failed");
+  if (!response.ok) {
+    throw new Error("Google token verification failed");
+  }
 
   const payload = await response.json();
+
   if (
     payload.aud !== GOOGLE_CLIENT_ID ||
     payload.email_verified !== "true" ||
@@ -302,12 +322,19 @@ async function verifyGoogleIdToken(credential) {
 }
 
 function isGoogleAdmin(email) {
-  return GOOGLE_ADMIN_EMAILS.has(String(email || "").trim().toLowerCase());
+  return GOOGLE_ADMIN_EMAILS.has(
+    String(email || "").trim().toLowerCase()
+  );
 }
 
 async function getGoogleUsername(googleUser, currentUserId) {
   const fallbackName = String(googleUser.email || "").split("@")[0];
-  const baseName = String(googleUser.name || fallbackName).trim().slice(0, 255) || "Google User";
+
+  const baseName =
+    String(googleUser.name || fallbackName)
+      .trim()
+      .slice(0, 255) || "Google User";
+
   let username = baseName;
   let suffix = 2;
 
@@ -316,10 +343,16 @@ async function getGoogleUsername(googleUser, currentUserId) {
       "SELECT id FROM users WHERE username = $1 AND id <> $2",
       [username, currentUserId || 0]
     );
+
     if (!result.rows.length) return username;
 
     const suffixText = ` ${suffix}`;
-    username = `${baseName.slice(0, 255 - suffixText.length)}${suffixText}`;
+
+    username = `${baseName.slice(
+      0,
+      255 - suffixText.length
+    )}${suffixText}`;
+
     suffix += 1;
   }
 }
@@ -328,21 +361,33 @@ fastify.post("/auth/google", async (request, reply) => {
   const { credential } = request.body ?? {};
 
   if (!credential) {
-    return reply.code(400).send({ error: "Google sign-in is required." });
+    return reply.code(400).send({
+      error: "Google sign-in is required.",
+    });
   }
 
   try {
     const googleUser = await verifyGoogleIdToken(credential);
+
     const existing = await pool.query(
       "SELECT * FROM users WHERE google_subject = $1 OR email = $2 ORDER BY google_subject = $1 DESC LIMIT 1",
       [googleUser.sub, googleUser.email]
     );
+
     let user = existing.rows[0];
-    const username = await getGoogleUsername(googleUser, user?.id);
+
+    const username = await getGoogleUsername(
+      googleUser,
+      user?.id
+    );
+
     const admin = isGoogleAdmin(googleUser.email);
 
     if (user && user.is_banned) {
-      const banReason = (user.ban_reason || "").toString().trim() || "No reason provided";
+      const banReason =
+        (user.ban_reason || "").toString().trim() ||
+        "No reason provided";
+
       return reply.code(403).send({
         error: `You are banned. Reason: ${banReason}`,
         banned: true,
@@ -350,50 +395,109 @@ fastify.post("/auth/google", async (request, reply) => {
       });
     }
 
-    const sessionExpiresAt = Date.now() + SESSION_DURATION_MS;
+    const sessionExpiresAt =
+      Date.now() + SESSION_DURATION_MS;
 
     if (user) {
       await pool.query(
         `UPDATE users
-         SET google_subject = $1, username = $2, is_approved = true, is_online = true, last_seen = $3,
-             session_expires_at = $4, reauth_required = false,
+         SET google_subject = $1,
+             username = $2,
+             is_approved = true,
+             is_online = true,
+             last_seen = $3,
+             session_expires_at = $4,
+             reauth_required = false,
              role = CASE WHEN $5 THEN 'admin' ELSE role END
          WHERE id = $6`,
-        [googleUser.sub, username, Date.now(), sessionExpiresAt, admin, user.id]
+        [
+          googleUser.sub,
+          username,
+          Date.now(),
+          sessionExpiresAt,
+          admin,
+          user.id,
+        ]
       );
+
       user.username = username;
-      if (admin) user.role = "admin";
+
+      if (admin) {
+        user.role = "admin";
+      }
     } else {
-      const placeholderPassword = await bcrypt.hash(crypto.randomUUID(), 10);
+      const placeholderPassword =
+        await bcrypt.hash(crypto.randomUUID(), 10);
+
       const created = await pool.query(
-        `INSERT INTO users (username, email, password, google_subject, role, is_approved, is_online, last_seen, session_expires_at, reauth_required)
-         VALUES ($1, $2, $3, $4, $5, true, true, $6, $7, false) RETURNING *`,
-        [username, googleUser.email, placeholderPassword, googleUser.sub, admin ? "admin" : "user", Date.now(), sessionExpiresAt]
+        `INSERT INTO users
+         (username, email, password, google_subject, role,
+          is_approved, is_online, last_seen,
+          session_expires_at, reauth_required)
+         VALUES
+         ($1, $2, $3, $4, $5, true, true, $6, $7, false)
+         RETURNING *`,
+        [
+          username,
+          googleUser.email,
+          placeholderPassword,
+          googleUser.sub,
+          admin ? "admin" : "user",
+          Date.now(),
+          sessionExpiresAt,
+        ]
       );
+
       user = created.rows[0];
     }
 
-    const token = jwt.sign({ id: user.id, role: user.role }, SECRET_KEY);
-    return reply.send({ token, role: user.role, username: user.username });
+    const token = jwt.sign(
+      {
+        id: user.id,
+        role: user.role,
+      },
+      SECRET_KEY
+    );
+
+    return reply.send({
+      token,
+      role: user.role,
+      username: user.username,
+    });
+
   } catch (err) {
+    // IMPORTANT: Log the actual reason Google authentication failed.
+    console.error("GOOGLE LOGIN ERROR:", err);
+
     if (err.code === "23505") {
-      return reply.code(400).send({ error: "That username is already in use." });
+      return reply.code(400).send({
+        error: "That username is already in use.",
+      });
     }
-    return reply.code(401).send({ error: "Google sign-in could not be verified." });
+
+    return reply.code(401).send({
+      error: "Google sign-in could not be verified.",
+      details:
+        err?.message ||
+        "Unknown Google authentication error",
+    });
   }
 });
 
 fastify.post("/heartbeat", async (request, reply) => {
   const token = getBearerToken(request);
-  if (!token) return reply.code(401).send({ error: "No token" });
+
+  if (!token) {
+    return reply.code(401).send({ error: "No token" });
+  }
 
   try {
     const decoded = await verifyActiveToken(token);
 
-    await pool.query("UPDATE users SET is_online = true, last_seen = $1 WHERE id = $2", [
-      Date.now(),
-      decoded.id,
-    ]);
+    await pool.query(
+      "UPDATE users SET is_online = true, last_seen = $1 WHERE id = $2",
+      [Date.now(), decoded.id]
+    );
 
     return reply.send({ status: "ok" });
   } catch {
@@ -402,16 +506,27 @@ fastify.post("/heartbeat", async (request, reply) => {
 });
 
 fastify.post("/offline", async (request, reply) => {
-  const token = getBearerToken(request) || request.body?.token;
-  if (!token) return reply.code(401).send();
+  const token =
+    getBearerToken(request) ||
+    request.body?.token;
+
+  if (!token) {
+    return reply.code(401).send();
+  }
 
   try {
     const decoded = verifyToken(token);
+
     if (decoded) {
       await pool.query(
         `UPDATE users
          SET is_online = false,
-             reauth_required = CASE WHEN session_expires_at <= $1 THEN true ELSE reauth_required END
+             reauth_required =
+               CASE
+                 WHEN session_expires_at <= $1
+                 THEN true
+                 ELSE reauth_required
+               END
          WHERE id = $2`,
         [Date.now(), decoded.id]
       );
@@ -423,41 +538,83 @@ fastify.post("/offline", async (request, reply) => {
 
 fastify.post("/requests", async (request, reply) => {
   const token = getBearerToken(request);
-  if (!token) return reply.code(401).send({ error: "Unauthorized" });
 
-  const { requestType, subject, details, pageUrl } = request.body ?? {};
+  if (!token) {
+    return reply.code(401).send({
+      error: "Unauthorized",
+    });
+  }
+
+  const {
+    requestType,
+    subject,
+    details,
+    pageUrl,
+  } = request.body ?? {};
+
   if (!requestType || !subject || !details) {
     return reply
       .code(400)
-      .send({ error: "Request type, subject, and details are required." });
+      .send({
+        error:
+          "Request type, subject, and details are required.",
+      });
   }
 
   try {
-    const decoded = await verifyActiveToken(token);
+    const decoded =
+      await verifyActiveToken(token);
 
-    const userLookup = await pool.query("SELECT username FROM users WHERE id = $1", [decoded.id]);
-    const username = userLookup.rows[0]?.username || "Unknown User";
-
-    await pool.query(
-      `INSERT INTO request_submissions (user_id, username, request_type, subject, details, page_url)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [decoded.id, username, requestType, subject.trim(), details.trim(), (pageUrl || "").trim()]
+    const userLookup = await pool.query(
+      "SELECT username FROM users WHERE id = $1",
+      [decoded.id]
     );
 
-    return reply.send({ message: "Your request was submitted successfully." });
+    const username =
+      userLookup.rows[0]?.username ||
+      "Unknown User";
+
+    await pool.query(
+      `INSERT INTO request_submissions
+       (user_id, username, request_type, subject, details, page_url)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        decoded.id,
+        username,
+        requestType,
+        subject.trim(),
+        details.trim(),
+        (pageUrl || "").trim(),
+      ]
+    );
+
+    return reply.send({
+      message:
+        "Your request was submitted successfully.",
+    });
   } catch {
-    return reply.code(401).send({ error: "Unauthorized" });
+    return reply.code(401).send({
+      error: "Unauthorized",
+    });
   }
 });
 
 fastify.get("/custom-games", async (request, reply) => {
   const token = getBearerToken(request);
-  if (!token) return reply.code(401).send({ error: "Unauthorized" });
+
+  if (!token) {
+    return reply.code(401).send({
+      error: "Unauthorized",
+    });
+  }
 
   try {
-    const decoded = await verifyActiveToken(token);
+    const decoded =
+      await verifyActiveToken(token);
+
     const result = await pool.query(
-      `SELECT id, name, game_type, target_url, html_code, icon_data, is_published
+      `SELECT id, name, game_type, target_url,
+              html_code, icon_data, is_published
        FROM custom_games
        WHERE user_id = $1
        ORDER BY id ASC`,
@@ -467,58 +624,109 @@ fastify.get("/custom-games", async (request, reply) => {
     const games = result.rows.map((row) => ({
       name: row.name || "",
       customId: `cg-${row.id}`,
-      type: row.game_type === "html" ? "html" : "url",
+      type:
+        row.game_type === "html"
+          ? "html"
+          : "url",
       url: row.target_url || "",
       html: row.html_code || "",
       icon: row.icon_data || "",
       published: Boolean(row.is_published),
     }));
+
     return reply.send({ games });
   } catch {
-    return reply.code(401).send({ error: "Unauthorized" });
+    return reply.code(401).send({
+      error: "Unauthorized",
+    });
   }
 });
 
 fastify.post("/custom-games", async (request, reply) => {
   const token = getBearerToken(request);
-  if (!token) return reply.code(401).send({ error: "Unauthorized" });
+
+  if (!token) {
+    return reply.code(401).send({
+      error: "Unauthorized",
+    });
+  }
 
   const { games } = request.body ?? {};
+
   if (!Array.isArray(games)) {
-    return reply.code(400).send({ error: "Games array is required." });
+    return reply.code(400).send({
+      error: "Games array is required.",
+    });
   }
 
   try {
-    const decoded = await verifyActiveToken(token);
+    const decoded =
+      await verifyActiveToken(token);
 
-    await pool.query("DELETE FROM custom_games WHERE user_id = $1", [decoded.id]);
+    await pool.query(
+      "DELETE FROM custom_games WHERE user_id = $1",
+      [decoded.id]
+    );
 
     for (const game of games) {
-      const name = String(game?.name || "").trim().slice(0, 255);
-      const gameType = game?.type === "html" ? "html" : "url";
-      const targetUrl = String(game?.url || "").trim();
-      const htmlCode = String(game?.html || "").trim();
-      const iconData = String(game?.icon || "").trim();
-      const published = Boolean(game?.published);
+      const name =
+        String(game?.name || "")
+          .trim()
+          .slice(0, 255);
+
+      const gameType =
+        game?.type === "html"
+          ? "html"
+          : "url";
+
+      const targetUrl =
+        String(game?.url || "").trim();
+
+      const htmlCode =
+        String(game?.html || "").trim();
+
+      const iconData =
+        String(game?.icon || "").trim();
+
+      const published =
+        Boolean(game?.published);
+
       if (!name) continue;
 
       await pool.query(
-        `INSERT INTO custom_games (user_id, name, game_type, target_url, html_code, icon_data, is_published)
+        `INSERT INTO custom_games
+         (user_id, name, game_type, target_url,
+          html_code, icon_data, is_published)
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [decoded.id, name, gameType, targetUrl, htmlCode, iconData, published]
+        [
+          decoded.id,
+          name,
+          gameType,
+          targetUrl,
+          htmlCode,
+          iconData,
+          published,
+        ]
       );
     }
 
-    return reply.send({ message: "Custom games saved." });
+    return reply.send({
+      message: "Custom games saved.",
+    });
   } catch {
-    return reply.code(401).send({ error: "Unauthorized" });
+    return reply.code(401).send({
+      error: "Unauthorized",
+    });
   }
 });
 
 fastify.get("/public-games", async (_request, reply) => {
   try {
     const result = await pool.query(
-      `SELECT g.id, g.user_id, g.name, g.game_type, g.target_url, g.html_code, g.icon_data, u.username
+      `SELECT g.id, g.user_id, g.name,
+              g.game_type, g.target_url,
+              g.html_code, g.icon_data,
+              u.username
        FROM custom_games g
        LEFT JOIN users u ON u.id = g.user_id
        WHERE g.is_published = true
@@ -528,114 +736,202 @@ fastify.get("/public-games", async (_request, reply) => {
     const games = result.rows.map((row) => ({
       customId: `cg-${row.id}`,
       ownerId: row.user_id,
-      ownerUsername: row.username || "Unknown User",
+      ownerUsername:
+        row.username || "Unknown User",
       name: row.name || "",
-      type: row.game_type === "html" ? "html" : "url",
+      type:
+        row.game_type === "html"
+          ? "html"
+          : "url",
       url: row.target_url || "",
       html: row.html_code || "",
       icon: row.icon_data || "",
       published: true,
     }));
+
     return reply.send({ games });
   } catch {
-    return reply.code(500).send({ error: "Database error" });
+    return reply.code(500).send({
+      error: "Database error",
+    });
   }
 });
 
-fastify.get("/admin/users", { preHandler: verifyAdmin }, async (_request, reply) => {
-  try {
-    const result = await pool.query(
-      "SELECT id, username, email, role, is_approved, is_banned, ban_reason, is_online FROM users ORDER BY id ASC"
-    );
-    return reply.send(result.rows);
-  } catch {
-    return reply.code(500).send({ error: "Database error" });
-  }
-});
-
-fastify.get("/admin/requests", { preHandler: verifyAdmin }, async (_request, reply) => {
-  try {
-    const result = await pool.query(
-      "SELECT id, username, request_type, subject, details, page_url, created_at FROM request_submissions ORDER BY created_at DESC, id DESC"
-    );
-    return reply.send(result.rows);
-  } catch {
-    return reply.code(500).send({ error: "Database error" });
-  }
-});
-
-fastify.post("/admin/action", { preHandler: verifyAdmin }, async (request, reply) => {
-  const { userId, action, reason } = request.body ?? {};
-
-  try {
-    if (action === "ban") {
-      const safeReason = (reason || "").toString().trim() || "No reason provided";
-      await pool.query(
-        "UPDATE users SET is_banned = true, is_online = false, ban_reason = $1 WHERE id = $2",
-        [safeReason, userId]
+fastify.get(
+  "/admin/users",
+  { preHandler: verifyAdmin },
+  async (_request, reply) => {
+    try {
+      const result = await pool.query(
+        `SELECT id, username, email, role,
+                is_approved, is_banned,
+                ban_reason, is_online
+         FROM users
+         ORDER BY id ASC`
       );
-    }
 
-    if (action === "unban") {
-      await pool.query("UPDATE users SET is_banned = false, ban_reason = '' WHERE id = $1", [
-        userId,
-      ]);
+      return reply.send(result.rows);
+    } catch {
+      return reply.code(500).send({
+        error: "Database error",
+      });
     }
-
-    return reply.send({ message: "Success" });
-  } catch {
-    return reply.code(500).send({ error: "Database error" });
   }
-});
+);
 
-fastify.get("/admin/custom-games", { preHandler: verifyAdmin }, async (_request, reply) => {
-  try {
-    const result = await pool.query(
-      `SELECT g.id, g.user_id, u.username, g.name, g.game_type, g.target_url, g.is_published, g.created_at
-       FROM custom_games g
-       LEFT JOIN users u ON u.id = g.user_id
-       ORDER BY g.id DESC`
-    );
+fastify.get(
+  "/admin/requests",
+  { preHandler: verifyAdmin },
+  async (_request, reply) => {
+    try {
+      const result = await pool.query(
+        `SELECT id, username, request_type,
+                subject, details, page_url,
+                created_at
+         FROM request_submissions
+         ORDER BY created_at DESC, id DESC`
+      );
 
-    return reply.send(result.rows);
-  } catch {
-    return reply.code(500).send({ error: "Database error" });
+      return reply.send(result.rows);
+    } catch {
+      return reply.code(500).send({
+        error: "Database error",
+      });
+    }
   }
-});
+);
 
-fastify.post("/admin/custom-games/action", { preHandler: verifyAdmin }, async (request, reply) => {
-  const { gameId, action } = request.body ?? {};
-  const parsedGameId = Number(gameId);
+fastify.post(
+  "/admin/action",
+  { preHandler: verifyAdmin },
+  async (request, reply) => {
+    const {
+      userId,
+      action,
+      reason,
+    } = request.body ?? {};
 
-  if (!Number.isInteger(parsedGameId) || parsedGameId <= 0) {
-    return reply.code(400).send({ error: "Valid gameId is required." });
+    try {
+      if (action === "ban") {
+        const safeReason =
+          (reason || "")
+            .toString()
+            .trim() ||
+          "No reason provided";
+
+        await pool.query(
+          "UPDATE users SET is_banned = true, is_online = false, ban_reason = $1 WHERE id = $2",
+          [safeReason, userId]
+        );
+      }
+
+      if (action === "unban") {
+        await pool.query(
+          "UPDATE users SET is_banned = false, ban_reason = '' WHERE id = $1",
+          [userId]
+        );
+      }
+
+      return reply.send({
+        message: "Success",
+      });
+    } catch {
+      return reply.code(500).send({
+        error: "Database error",
+      });
+    }
   }
+);
 
-  try {
-    if (action === "publish") {
-      await pool.query("UPDATE custom_games SET is_published = true WHERE id = $1", [
-        parsedGameId,
-      ]);
-      return reply.send({ message: "Game published." });
+fastify.get(
+  "/admin/custom-games",
+  { preHandler: verifyAdmin },
+  async (_request, reply) => {
+    try {
+      const result = await pool.query(
+        `SELECT g.id, g.user_id, u.username,
+                g.name, g.game_type,
+                g.target_url, g.is_published,
+                g.created_at
+         FROM custom_games g
+         LEFT JOIN users u ON u.id = g.user_id
+         ORDER BY g.id DESC`
+      );
+
+      return reply.send(result.rows);
+    } catch {
+      return reply.code(500).send({
+        error: "Database error",
+      });
+    }
+  }
+);
+
+fastify.post(
+  "/admin/custom-games/action",
+  { preHandler: verifyAdmin },
+  async (request, reply) => {
+    const {
+      gameId,
+      action,
+    } = request.body ?? {};
+
+    const parsedGameId =
+      Number(gameId);
+
+    if (
+      !Number.isInteger(parsedGameId) ||
+      parsedGameId <= 0
+    ) {
+      return reply.code(400).send({
+        error: "Valid gameId is required.",
+      });
     }
 
-    if (action === "unpublish") {
-      await pool.query("UPDATE custom_games SET is_published = false WHERE id = $1", [
-        parsedGameId,
-      ]);
-      return reply.send({ message: "Game unpublished." });
-    }
+    try {
+      if (action === "publish") {
+        await pool.query(
+          "UPDATE custom_games SET is_published = true WHERE id = $1",
+          [parsedGameId]
+        );
 
-    if (action === "delete") {
-      await pool.query("DELETE FROM custom_games WHERE id = $1", [parsedGameId]);
-      return reply.send({ message: "Game deleted." });
-    }
+        return reply.send({
+          message: "Game published.",
+        });
+      }
 
-    return reply.code(400).send({ error: "Invalid action." });
-  } catch {
-    return reply.code(500).send({ error: "Database error" });
+      if (action === "unpublish") {
+        await pool.query(
+          "UPDATE custom_games SET is_published = false WHERE id = $1",
+          [parsedGameId]
+        );
+
+        return reply.send({
+          message: "Game unpublished.",
+        });
+      }
+
+      if (action === "delete") {
+        await pool.query(
+          "DELETE FROM custom_games WHERE id = $1",
+          [parsedGameId]
+        );
+
+        return reply.send({
+          message: "Game deleted.",
+        });
+      }
+
+      return reply.code(400).send({
+        error: "Invalid action.",
+      });
+    } catch {
+      return reply.code(500).send({
+        error: "Database error",
+      });
+    }
   }
-});
+);
 
 function sanitizeAiMessages(messages) {
   if (!Array.isArray(messages)) return [];
@@ -643,144 +939,317 @@ function sanitizeAiMessages(messages) {
   return messages
     .slice(-12)
     .map((message) => {
-      const role = message?.role === "assistant" ? "assistant" : "user";
-      const content = String(message?.content || "").trim().slice(0, 2000);
-      return content ? { role, content } : null;
+      const role =
+        message?.role === "assistant"
+          ? "assistant"
+          : "user";
+
+      const content =
+        String(message?.content || "")
+          .trim()
+          .slice(0, 2000);
+
+      return content
+        ? { role, content }
+        : null;
     })
     .filter(Boolean);
 }
 
-fastify.post("/ai/chat", async (request, reply) => {
-  const token = getBearerToken(request);
-  if (!token) return reply.code(401).send({ error: "Please log in to use Tempest AI." });
+fastify.post(
+  "/ai/chat",
+  async (request, reply) => {
+    const token =
+      getBearerToken(request);
 
-  try {
-    await verifyActiveToken(token);
-  } catch {
-    return reply.code(401).send({ error: "Please log in again to use Tempest AI." });
-  }
-
-  if (!GROQ_API_KEY) {
-    return reply.code(503).send({
-      error: "Tempest AI needs a GROQ_API_KEY environment variable on the server.",
-    });
-  }
-
-  const messages = sanitizeAiMessages(request.body?.messages);
-  if (!messages.length || messages[messages.length - 1].role !== "user") {
-    return reply.code(400).send({ error: "Send a message for Tempest AI to answer." });
-  }
-
-  try {
-    const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${GROQ_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: GROQ_MODEL,
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are Unbreaking AI inside the Unbreaking site. The link to the site you are on is https://unbreakingone.onrender.com Be smart, helpful, concise, and friendly. You will help the user with whatever help they need. If the user asks for code, put every code sample in fenced Markdown code blocks with the language name so the site can show copy buttons. Give working code and explain exactly where it goes. Do not claim to do things outside this chat unless the site gives you a tool for it.",
-          },
-          ...messages,
-        ],
-        temperature: 0.65,
-        max_completion_tokens: 900,
-      }),
-    });
-
-    const data = await groqResponse.json().catch(() => ({}));
-    if (!groqResponse.ok) {
-      return reply.code(groqResponse.status).send({
-        error: data?.error?.message || "Unbreaking AI could not answer right now.",
+    if (!token) {
+      return reply.code(401).send({
+        error:
+          "Please log in to use Tempest AI.",
       });
     }
 
-    const replyText = data?.choices?.[0]?.message?.content?.trim();
-    if (!replyText) {
-      return reply.code(502).send({ error: "Unbreaking AI returned an empty answer." });
+    try {
+      await verifyActiveToken(token);
+    } catch {
+      return reply.code(401).send({
+        error:
+          "Please log in again to use Tempest AI.",
+      });
     }
 
-    return reply.send({ reply: replyText, model: data?.model || GROQ_MODEL });
-  } catch {
-    return reply.code(502).send({ error: "Could not reach Unbreaking AI right now." });
-  }
-});
+    if (!GROQ_API_KEY) {
+      return reply.code(503).send({
+        error:
+          "Tempest AI needs a GROQ_API_KEY environment variable on the server.",
+      });
+    }
 
-fastify.get("/", async (_request, reply) => {
-  return reply.sendFile("index.html");
-});
+    const messages =
+      sanitizeAiMessages(
+        request.body?.messages
+      );
 
-fastify.get("/p", async (_request, reply) => {
-  return reply.type("text/html").sendFile("proxy.html");
-});
+    if (
+      !messages.length ||
+      messages[messages.length - 1].role !==
+        "user"
+    ) {
+      return reply.code(400).send({
+        error:
+          "Send a message for Tempest AI to answer.",
+      });
+    }
 
-fastify.get("/music-files", async (_request, reply) => {
-  try {
-    const musicDir = path.join(publicPath, "music");
-    const items = await fs.promises.readdir(musicDir, { withFileTypes: true });
-    const files = items
-      .filter((item) => item.isFile())
-      .map((item) => item.name)
-      .sort((a, b) => a.localeCompare(b));
-    return reply.send({ files });
-  } catch {
-    return reply.code(500).send({ error: "Could not load music files." });
-  }
-});
+    try {
+      const groqResponse = await fetch(
+        "https://api.groq.com/openai/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+            Authorization:
+              `Bearer ${GROQ_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: GROQ_MODEL,
+            messages: [
+              {
+                role: "system",
+                content:
+                  "You are Unbreaking AI inside the Unbreaking site. The link to the site you are on is https://unbreakingone.onrender.com Be smart, helpful, concise, and friendly. You will help the user with whatever help they need. If the user asks for code, put every code sample in fenced Markdown code blocks with the language name so the site can show copy buttons. Give working code and explain exactly where it goes. Do not claim to do things outside this chat unless the site gives you a tool for it.",
+              },
+              ...messages,
+            ],
+            temperature: 0.65,
+            max_completion_tokens: 900,
+          }),
+        }
+      );
 
-fastify.get("/proxy", async (_request, reply) => {
-  return reply.redirect(301, "/p");
-});
+      const data =
+        await groqResponse
+          .json()
+          .catch(() => ({}));
 
-fastify.get("/app/*", async (request, reply) => {
-  const appPath = request.params["*"] || "";
-  return reply.redirect(301, `/game/${appPath}`);
-});
+      if (!groqResponse.ok) {
+        return reply
+          .code(groqResponse.status)
+          .send({
+            error:
+              data?.error?.message ||
+              "Unbreaking AI could not answer right now.",
+          });
+      }
 
-fastify.setNotFoundHandler((request, reply) => {
-  const pathname = request.raw.url?.split("?")[0] ?? "/";
-  const decodedPath = decodeURIComponent(pathname);
-  const isStartupProxyPath = /^(?:\/p)?\/search\/.+/i.test(decodedPath);
-  const lastPathSegment = pathname.split("/").pop() ?? "";
-  const hasFileExtension = /\.[a-z0-9]{2,8}$/i.test(lastPathSegment);
-  const normalizedPath = decodedPath.replace(/^\/+/, "");
+      const replyText =
+        data?.choices?.[0]?.message?.content?.trim();
 
-  if (
-    pathname.startsWith("/admin/") ||
-    pathname === "/auth/google" ||
-    pathname === "/heartbeat" ||
-    pathname === "/offline" ||
-    pathname === "/requests" ||
-    pathname === "/ai/chat" ||
-    pathname === "/custom-games" ||
-    pathname === "/public-games"
-  ) {
-    return reply.code(404).send({ error: "Not Found" });
-  }
+      if (!replyText) {
+        return reply.code(502).send({
+          error:
+            "Unbreaking AI returned an empty answer.",
+        });
+      }
 
-  if (isStartupProxyPath) {
-    return reply.type("text/html").sendFile("proxy.html");
-  }
-
-  if (!hasFileExtension && normalizedPath) {
-    const htmlFileCandidate = `${normalizedPath}.html`;
-    const htmlFilePath = path.join(publicPath, htmlFileCandidate);
-    if (fs.existsSync(htmlFilePath)) {
-      return reply.type("text/html").sendFile(htmlFileCandidate);
+      return reply.send({
+        reply: replyText,
+        model:
+          data?.model ||
+          GROQ_MODEL,
+      });
+    } catch {
+      return reply.code(502).send({
+        error:
+          "Could not reach Unbreaking AI right now.",
+      });
     }
   }
+);
 
-  if (!hasFileExtension) {
-    return reply.type("text/html").sendFile("index.html");
+fastify.get(
+  "/",
+  async (_request, reply) => {
+    return reply.sendFile("index.html");
   }
+);
 
-  return reply.code(404).type("text/html").sendFile("404.html");
-});
+fastify.get(
+  "/p",
+  async (_request, reply) => {
+    return reply
+      .type("text/html")
+      .sendFile("proxy.html");
+  }
+);
+
+fastify.get(
+  "/music-files",
+  async (_request, reply) => {
+    try {
+      const musicDir =
+        path.join(
+          publicPath,
+          "music"
+        );
+
+      const items =
+        await fs.promises.readdir(
+          musicDir,
+          { withFileTypes: true }
+        );
+
+      const files = items
+        .filter(
+          (item) => item.isFile()
+        )
+        .map(
+          (item) => item.name
+        )
+        .sort(
+          (a, b) =>
+            a.localeCompare(b)
+        );
+
+      return reply.send({
+        files,
+      });
+    } catch {
+      return reply.code(500).send({
+        error:
+          "Could not load music files.",
+      });
+    }
+  }
+);
+
+fastify.get(
+  "/proxy",
+  async (_request, reply) => {
+    return reply.redirect(
+      301,
+      "/p"
+    );
+  }
+);
+
+fastify.get(
+  "/app/*",
+  async (request, reply) => {
+    const appPath =
+      request.params["*"] ||
+      "";
+
+    return reply.redirect(
+      301,
+      `/game/${appPath}`
+    );
+  }
+);
+
+fastify.setNotFoundHandler(
+  (request, reply) => {
+    const pathname =
+      request.raw.url
+        ?.split("?")[0] ?? "";
+
+    const decodedPath =
+      decodeURIComponent(
+        pathname
+      );
+
+    const isStartupProxyPath =
+      /^(?:\/p)?\/search\/.+/i.test(
+        decodedPath
+      );
+
+    const lastPathSegment =
+      pathname
+        .split("/")
+        .pop() ?? "";
+
+    const hasFileExtension =
+      /\.[a-z0-9]{2,8}$/i.test(
+        lastPathSegment
+      );
+
+    const normalizedPath =
+      decodedPath.replace(
+        /^\/+/,
+        ""
+      );
+
+    if (
+      pathname.startsWith(
+        "/admin/"
+      ) ||
+      pathname ===
+        "/auth/google" ||
+      pathname ===
+        "/heartbeat" ||
+      pathname ===
+        "/offline" ||
+      pathname ===
+        "/requests" ||
+      pathname ===
+        "/ai/chat" ||
+      pathname ===
+        "/custom-games" ||
+      pathname ===
+        "/public-games"
+    ) {
+      return reply
+        .code(404)
+        .send({
+          error: "Not Found",
+        });
+    }
+
+    if (isStartupProxyPath) {
+      return reply
+        .type("text/html")
+        .sendFile("proxy.html");
+    }
+
+    if (
+      !hasFileExtension &&
+      normalizedPath
+    ) {
+      const htmlFileCandidate =
+        `${normalizedPath}.html`;
+
+      const htmlFilePath =
+        path.join(
+          publicPath,
+          htmlFileCandidate
+        );
+
+      if (
+        fs.existsSync(
+          htmlFilePath
+        )
+      ) {
+        return reply
+          .type("text/html")
+          .sendFile(
+            htmlFileCandidate
+          );
+      }
+    }
+
+    if (!hasFileExtension) {
+      return reply
+        .type("text/html")
+        .sendFile("index.html");
+    }
+
+    return reply
+      .code(404)
+      .type("text/html")
+      .sendFile("404.html");
+  }
+);
 
 const start = async () => {
   try {
@@ -789,7 +1258,9 @@ const start = async () => {
       host: "0.0.0.0",
     });
 
-    console.log(`Server running on port ${port}`);
+    console.log(
+      `Server running on port ${port}`
+    );
   } catch (err) {
     console.error(err);
     process.exit(1);
