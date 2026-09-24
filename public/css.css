@@ -407,6 +407,30 @@ img {
   animation: pulseText 2s infinite alternate;
 }
 
+#homeDisclaimer {
+  position: absolute;
+  right: 20px;
+  bottom: 18px;
+  left: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: #b89de6;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  text-align: center;
+}
+
+#homeDisclaimer a {
+  color: #c8a8f0;
+}
+
+#homeDisclaimer a:hover,
+#homeDisclaimer a:focus-visible {
+  color: #fff;
+}
+
 #contentFrame {
   position: absolute;
   inset: 0;
