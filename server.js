@@ -108,16 +108,18 @@ const GOOGLE_ADMIN_EMAILS = new Set(["brooksm@carbonschools.org", "unbreaking98@
 
 /*
   In-memory DB
-  - Keeps minimal data: users, request_submissions, custom_games
+  - Keeps minimal data: users, request_submissions, custom_games, admin_messages
   - Non-persistent across restarts (consider adding JSON persistence or sqlite if you want persistence)
 */
 const inMemoryDb = {
   users: new Map(),
   requestSubmissions: [],
   customGames: [],
+  adminMessages: [],         // new: admin messages storage
   nextUserId: 1,
   nextRequestId: 1,
   nextGameId: 1,
+  nextAdminMessageId: 1     // new: id generator for admin messages
 };
 
 function toNumber(value, fallback = 0) {
@@ -324,6 +326,45 @@ const pool = {
           created_at: game.created_at,
         }));
       return { rows };
+    }
+
+    // admin_messages: select unread for user
+    if (lowercase.includes("select id, subject, message, created_at") && lowercase.includes("from admin_messages") && lowercase.includes("where user_id =") && lowercase.includes("is_read = false")) {
+      const userId = Number(params[0]);
+      const rows = inMemoryDb.adminMessages
+        .filter((m) => Number(m.user_id) === userId && !m.is_read)
+        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+        .map((m) => ({
+          id: m.id,
+          subject: m.subject,
+          message: m.message,
+          created_at: m.created_at,
+        }));
+      return { rows };
+    }
+
+    // mark admin messages read by ids (UPDATE admin_messages SET is_read = true WHERE id = ANY($1::int[]))
+    if (lowercase.includes("update admin_messages set is_read = true") && lowercase.includes("where id = any")) {
+      const ids = Array.isArray(params[0]) ? params[0].map((v) => Number(v)) : [];
+      for (const m of inMemoryDb.adminMessages) {
+        if (ids.includes(m.id)) m.is_read = true;
+      }
+      return { rows: [] };
+    }
+
+    // insert admin message
+    if (lowercase.includes("insert into admin_messages")) {
+      const [userId, subject, message] = params;
+      const record = {
+        id: inMemoryDb.nextAdminMessageId++,
+        user_id: Number(userId),
+        subject: String(subject || ""),
+        message: String(message || ""),
+        created_at: new Date().toISOString(),
+        is_read: false
+      };
+      inMemoryDb.adminMessages.push(record);
+      return { rows: [record] };
     }
 
     // periodic offline update
@@ -625,6 +666,18 @@ try {
     );
   `);
 
+  // new admin messages table
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS admin_messages (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL,
+      subject VARCHAR(255) DEFAULT '',
+      message TEXT NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      is_read BOOLEAN DEFAULT false
+    );
+  `);
+
   await pool.query("ALTER TABLE custom_games ADD COLUMN IF NOT EXISTS is_published BOOLEAN DEFAULT false");
   await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS google_subject VARCHAR(255) UNIQUE");
   await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS session_expires_at BIGINT DEFAULT 0");
@@ -636,7 +689,8 @@ try {
 }
 
 setInterval(async () => {
-  const cutoff = Date.now() - 15000;
+  // increase grace period from 15s to 60s to avoid race conditions where users are marked offline
+  const cutoff = Date.now() - 60000;
 
   try {
     await pool.query(
@@ -670,9 +724,11 @@ async function verifyActiveToken(token) {
     throw new Error("Reauthentication required");
   }
 
-  if (Number(user.session_expires_at) <= Date.now() && !user.is_online) {
+  // If the session expiry time has passed, require reauthentication.
+  // Do not rely on the transient is_online flag to decide this — the is_online
+  // state can flip due to short network delays and should not immediately force logout.
+  if (Number(user.session_expires_at) <= Date.now()) {
     await pool.query("UPDATE users SET reauth_required = true WHERE id = $1", [decoded.id]);
-
     throw new Error("Reauthentication required");
   }
 
@@ -855,9 +911,29 @@ fastify.post("/heartbeat", async (request, reply) => {
   try {
     const decoded = await verifyActiveToken(token);
 
+    // update online last_seen
     await pool.query("UPDATE users SET is_online = true, last_seen = $1 WHERE id = $2", [Date.now(), decoded.id]);
 
-    return reply.send({ status: "ok" });
+    // fetch unread admin messages for the user
+    const msgResult = await pool.query(
+      `SELECT id, subject, message, created_at
+       FROM admin_messages
+       WHERE user_id = $1 AND is_read = false
+       ORDER BY created_at ASC`,
+      [decoded.id]
+    );
+    const messages = msgResult.rows || [];
+
+    // mark them read so they don't keep showing forever
+    if (messages.length) {
+      const ids = messages.map((m) => m.id);
+      await pool.query(
+        `UPDATE admin_messages SET is_read = true WHERE id = ANY($1::int[])`,
+        [ids]
+      );
+    }
+
+    return reply.send({ status: "ok", messages });
   } catch {
     return reply.code(401).send({ error: "Unauthorized" });
   }
@@ -1113,6 +1189,32 @@ fastify.post("/admin/action", { preHandler: verifyAdmin }, async (request, reply
     return reply.code(500).send({
       error: "Database error",
     });
+  }
+});
+
+// new admin endpoint to send secret messages to users
+fastify.post("/admin/message", { preHandler: verifyAdmin }, async (request, reply) => {
+  const { userId, subject, message } = request.body ?? {};
+
+  if (!userId || !message) {
+    return reply.code(400).send({ error: "userId and message are required." });
+  }
+
+  try {
+    const parsedUserId = Number(userId);
+    if (!Number.isInteger(parsedUserId) || parsedUserId <= 0) {
+      return reply.code(400).send({ error: "Invalid userId" });
+    }
+
+    await pool.query(
+      `INSERT INTO admin_messages (user_id, subject, message) VALUES ($1, $2, $3)`,
+      [parsedUserId, (subject || "").toString().slice(0, 255), message.toString()]
+    );
+
+    return reply.send({ message: "Message sent" });
+  } catch (err) {
+    console.error("ADMIN MESSAGE ERROR:", err);
+    return reply.code(500).send({ error: "Database error" });
   }
 });
 
