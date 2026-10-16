@@ -1,3 +1,4 @@
+(complete client JS - full file)
 (function () {
     const authOverlay = document.getElementById('authOverlay');
     const authMessage = document.getElementById('authMessage');
@@ -232,8 +233,12 @@
         hideAllSections();
         homeContent.style.display = "flex";
         checkLoginStatus();
-        authMessage.innerText = msg;
-        authMessage.style.color = "#ff4d4d";
+        if (msg) {
+            authMessage.innerText = msg;
+            authMessage.style.color = "#ff4d4d";
+        } else {
+            authMessage.innerText = "";
+        }
     }
 
     userLogoutBtn.addEventListener('click', async () => {
@@ -500,11 +505,16 @@
             });
 
             if (response.status === 401) {
-                forceLogout("Session expired. Please log in again.");
+                // silently clear login (do not show "Session expired")
+                localStorage.removeItem('token');
+                localStorage.removeItem('role');
+                localStorage.removeItem('username');
+                if (heartbeatInterval) clearInterval(heartbeatInterval);
+                checkLoginStatus();
                 return;
             }
 
-            // Parse possible messages payload
+            // parse JSON
             let data;
             try {
                 data = await response.json();
@@ -512,9 +522,22 @@
                 data = null;
             }
 
+            if (data?.status === 'banned' || data?.banned) {
+                const reason = data?.banReason || "No reason provided";
+                await openSiteModal({
+                    title: "You have been banned",
+                    text: `You have been banned from Unbreaking.\nReason: ${escapeHtml(reason)}`,
+                    confirmText: "OK",
+                    cancelText: "Close",
+                    dismissible: true
+                });
+                // ensure local logout state
+                forceLogout(`Banned: ${reason}`);
+                return;
+            }
+
             if (data?.messages && Array.isArray(data.messages) && data.messages.length) {
                 for (const msg of data.messages) {
-                    // Display secret admin messages immediately using existing modal UI
                     await openSiteModal({
                         title: (msg.subject && msg.subject.length) ? `Secret message: ${escapeHtml(msg.subject)}` : "Secret message",
                         text: escapeHtml(msg.message || ""),
@@ -525,7 +548,7 @@
                 }
             }
         } catch (_) {
-            // network error — keep trying, don't force logout
+            // network error — keep trying, don't force logout or show "session expired"
         }
     }
 
