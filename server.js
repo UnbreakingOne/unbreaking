@@ -1,3 +1,4 @@
+(import and full file contents)
 import { createServer } from "node:http";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "url";
@@ -115,11 +116,11 @@ const inMemoryDb = {
   users: new Map(),
   requestSubmissions: [],
   customGames: [],
-  adminMessages: [],         // new: admin messages storage
+  adminMessages: [],
   nextUserId: 1,
   nextRequestId: 1,
   nextGameId: 1,
-  nextAdminMessageId: 1     // new: id generator for admin messages
+  nextAdminMessageId: 1
 };
 
 function toNumber(value, fallback = 0) {
@@ -367,21 +368,18 @@ const pool = {
       return { rows: [record] };
     }
 
-    // periodic offline update
+    // periodic offline update (no reauth/reset)
     if (
       lowercase.includes("update users set is_online = false,") &&
-      lowercase.includes("reauth_required = case") &&
       lowercase.includes("where last_seen <") &&
       lowercase.includes("and is_online = true")
     ) {
       const cutoff = toNumber(params[0], 0);
-      const now = Date.now();
       const usersToUpdate = getAllUsers().filter((user) => toNumber(user.last_seen, 0) < cutoff && user.is_online);
       for (const user of usersToUpdate) {
         const updatedUser = normalizeUser({
           ...user,
-          is_online: false,
-          reauth_required: Number(user.session_expires_at) <= now ? true : Boolean(user.reauth_required),
+          is_online: false
         });
         inMemoryDb.users.set(updatedUser.id, updatedUser);
       }
@@ -400,14 +398,13 @@ const pool = {
     }
 
     // offline endpoint update
-    if (lowercase.includes("update users set is_online = false,") && lowercase.includes("reauth_required =") && lowercase.includes("where id =")) {
+    if (lowercase.includes("update users set is_online = false,") && lowercase.includes("where id =")) {
       const userId = Number(params[1]);
       const user = getUserById(userId);
       if (user) {
         const updatedUser = normalizeUser({
           ...user,
-          is_online: false,
-          reauth_required: Number(user.session_expires_at) <= Date.now() ? true : Boolean(user.reauth_required),
+          is_online: false
         });
         inMemoryDb.users.set(updatedUser.id, updatedUser);
       }
@@ -666,7 +663,7 @@ try {
     );
   `);
 
-  // new admin messages table
+  // admin messages table (for admin -> client secret messages)
   await pool.query(`
     CREATE TABLE IF NOT EXISTS admin_messages (
       id SERIAL PRIMARY KEY,
@@ -688,17 +685,16 @@ try {
   console.error("DATABASE ERROR:", err);
 }
 
+// mark offline when last_seen older than cutoff (graceful)
 setInterval(async () => {
-  // increase grace period from 15s to 60s to avoid race conditions where users are marked offline
   const cutoff = Date.now() - 60000;
 
   try {
     await pool.query(
       `UPDATE users
-       SET is_online = false,
-           reauth_required = CASE WHEN session_expires_at <= $2 THEN true ELSE reauth_required END
+       SET is_online = false
        WHERE last_seen < $1 AND is_online = true`,
-      [cutoff, Date.now()]
+      [cutoff]
     );
   } catch {}
 }, 5000);
@@ -711,25 +707,19 @@ function verifyToken(token) {
   return jwt.verify(token, SECRET_KEY, { ignoreExpiration: true });
 }
 
+// verifyActiveToken: only checks token validity and that the user exists and is not banned.
+// It does NOT enforce session expiration / reauth behaviour.
 async function verifyActiveToken(token) {
   const decoded = verifyToken(token);
 
-  const result = await pool.query("SELECT is_online, session_expires_at, reauth_required FROM users WHERE id = $1", [decoded.id]);
+  const result = await pool.query("SELECT is_banned FROM users WHERE id = $1", [decoded.id]);
 
   const user = result.rows[0];
 
   if (!user) throw new Error("User not found");
 
-  if (user.reauth_required) {
-    throw new Error("Reauthentication required");
-  }
-
-  // If the session expiry time has passed, require reauthentication.
-  // Do not rely on the transient is_online flag to decide this — the is_online
-  // state can flip due to short network delays and should not immediately force logout.
-  if (Number(user.session_expires_at) <= Date.now()) {
-    await pool.query("UPDATE users SET reauth_required = true WHERE id = $1", [decoded.id]);
-    throw new Error("Reauthentication required");
+  if (user.is_banned) {
+    throw new Error("User banned");
   }
 
   return decoded;
@@ -901,6 +891,8 @@ fastify.post("/auth/google", async (request, reply) => {
   }
 });
 
+// heartbeat: returns either { status: "ok", messages: [...] } or { status: "banned", banReason: "..." }
+// It intentionally decodes the token without enforcing "active session expiry" so we can detect bans and kick immediately.
 fastify.post("/heartbeat", async (request, reply) => {
   const token = getBearerToken(request);
 
@@ -909,12 +901,26 @@ fastify.post("/heartbeat", async (request, reply) => {
   }
 
   try {
-    const decoded = await verifyActiveToken(token);
+    const decoded = verifyToken(token);
 
-    // update online last_seen
+    const userResult = await pool.query("SELECT id, is_banned, ban_reason FROM users WHERE id = $1", [decoded.id]);
+    const user = userResult.rows[0];
+
+    if (!user) {
+      return reply.code(401).send({ error: "Unauthorized" });
+    }
+
+    if (user.is_banned) {
+      // Ensure they are marked offline, and return a banned notice immediately.
+      try {
+        await pool.query("UPDATE users SET is_online = false WHERE id = $1", [decoded.id]);
+      } catch (_) {}
+      return reply.send({ status: "banned", banReason: (user.ban_reason || "").toString() });
+    }
+
+    // Normal heartbeat update + deliver any unread admin messages
     await pool.query("UPDATE users SET is_online = true, last_seen = $1 WHERE id = $2", [Date.now(), decoded.id]);
 
-    // fetch unread admin messages for the user
     const msgResult = await pool.query(
       `SELECT id, subject, message, created_at
        FROM admin_messages
@@ -924,7 +930,6 @@ fastify.post("/heartbeat", async (request, reply) => {
     );
     const messages = msgResult.rows || [];
 
-    // mark them read so they don't keep showing forever
     if (messages.length) {
       const ids = messages.map((m) => m.id);
       await pool.query(
@@ -934,7 +939,8 @@ fastify.post("/heartbeat", async (request, reply) => {
     }
 
     return reply.send({ status: "ok", messages });
-  } catch {
+  } catch (err) {
+    // If token decode fails, return 401
     return reply.code(401).send({ error: "Unauthorized" });
   }
 });
@@ -952,13 +958,7 @@ fastify.post("/offline", async (request, reply) => {
     if (decoded) {
       await pool.query(
         `UPDATE users
-         SET is_online = false,
-             reauth_required =
-               CASE
-                 WHEN session_expires_at <= $1
-                 THEN true
-                 ELSE reauth_required
-               END
+         SET is_online = false
          WHERE id = $2`,
         [Date.now(), decoded.id]
       );
@@ -1175,6 +1175,7 @@ fastify.post("/admin/action", { preHandler: verifyAdmin }, async (request, reply
     if (action === "ban") {
       const safeReason = (reason || "").toString().trim() || "No reason provided";
 
+      // Ban and ensure the user is marked offline immediately.
       await pool.query("UPDATE users SET is_banned = true, is_online = false, ban_reason = $1 WHERE id = $2", [safeReason, userId]);
     }
 
@@ -1189,32 +1190,6 @@ fastify.post("/admin/action", { preHandler: verifyAdmin }, async (request, reply
     return reply.code(500).send({
       error: "Database error",
     });
-  }
-});
-
-// new admin endpoint to send secret messages to users
-fastify.post("/admin/message", { preHandler: verifyAdmin }, async (request, reply) => {
-  const { userId, subject, message } = request.body ?? {};
-
-  if (!userId || !message) {
-    return reply.code(400).send({ error: "userId and message are required." });
-  }
-
-  try {
-    const parsedUserId = Number(userId);
-    if (!Number.isInteger(parsedUserId) || parsedUserId <= 0) {
-      return reply.code(400).send({ error: "Invalid userId" });
-    }
-
-    await pool.query(
-      `INSERT INTO admin_messages (user_id, subject, message) VALUES ($1, $2, $3)`,
-      [parsedUserId, (subject || "").toString().slice(0, 255), message.toString()]
-    );
-
-    return reply.send({ message: "Message sent" });
-  } catch (err) {
-    console.error("ADMIN MESSAGE ERROR:", err);
-    return reply.code(500).send({ error: "Database error" });
   }
 });
 
