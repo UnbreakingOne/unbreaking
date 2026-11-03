@@ -463,9 +463,9 @@ img {
   transform: none;
 }
 
-
 #gamesContent,
 #appsContent,
+#messagesContent,
 #requestContent,
 #adminDashboard,
 #proxyContent {
@@ -562,6 +562,7 @@ img {
 }
 
 .addGameField input[type="text"],
+.addGameField input[type="file"],
 .addGameField textarea,
 .addGameField select {
   width: 100%;
@@ -576,11 +577,11 @@ img {
 .addGameField textarea {
   min-height: 180px;
   resize: vertical;
-  /* keep monospace for code editing — remove this line if you want Mojangles here too */
   font-family: Consolas, Monaco, monospace;
 }
 
-#addGameIcon {
+#addGameIcon,
+#addGameFile {
   width: 100%;
   border-radius: 10px;
   border: 2px solid var(--glow-color);
@@ -591,7 +592,8 @@ img {
   box-shadow: 0 0 10px var(--glow-color), inset 0 0 5px var(--glow-color);
 }
 
-#addGameIcon::file-selector-button {
+#addGameIcon::file-selector-button,
+#addGameFile::file-selector-button {
   border: 2px solid var(--glow-color);
   border-radius: 8px;
   background: transparent;
@@ -602,20 +604,42 @@ img {
   cursor: pointer;
 }
 
-#addGameIcon::file-selector-button:hover {
+#addGameIcon::file-selector-button:hover,
+#addGameFile::file-selector-button:hover {
   background: var(--glow-color);
   color: #fff;
   box-shadow: 0 0 10px var(--glow-color);
 }
 
-#htmlHelpText {
-  margin: 8px 0 0 0;
+#htmlHelpText,
+.gameOptionHelp {
+  margin: 8px 0 0;
   color: #e0ccff;
+  font-size: 0.9rem;
+  line-height: 1.45;
 }
 
 #htmlHelpText a {
   color: #c8a8f0;
   font-weight: bold;
+}
+
+.gameOptionLabel {
+  display: flex !important;
+  align-items: center;
+  gap: 9px;
+  margin-top: 12px;
+  cursor: pointer;
+  color: #d6bbff;
+  font-weight: bold;
+}
+
+.gameOptionLabel input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--glow-color);
+  cursor: pointer;
 }
 
 .addGameActions {
@@ -632,6 +656,17 @@ img {
   padding: 10px 14px;
   font-weight: bold;
   cursor: pointer;
+}
+
+.addGameActions button:hover {
+  background: var(--glow-color);
+  color: #fff;
+  box-shadow: 0 0 12px var(--glow-color);
+}
+
+.addGameActions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .linksContainer {
@@ -718,7 +753,8 @@ img {
   text-align: center;
 }
 
-#requestContent h1 {
+#requestContent h1,
+#messagesContent h1 {
   color: #c8a8f0;
   text-shadow: 0 0 10px var(--glow-color);
   animation: pulseText 2s infinite alternate;
@@ -775,6 +811,206 @@ img {
   color: #b388ff;
   font-weight: bold;
   text-shadow: 0 0 6px var(--glow-color);
+}
+
+/* Messages app */
+#messagesContent {
+  padding: 40px 20px;
+  text-align: center;
+}
+
+#messagesDescription {
+  max-width: 760px;
+  margin: 0 auto 20px;
+  color: #c8a8f0;
+  line-height: 1.5;
+}
+
+#messagesStatus {
+  width: min(760px, 100%);
+  margin: 0 auto 14px;
+  color: #c8a8f0;
+  text-align: center;
+}
+
+#messagesList {
+  display: grid;
+  grid-template-columns: minmax(0, 760px);
+  justify-content: center;
+  gap: 14px;
+  width: 100%;
+}
+
+.siteMessageCard {
+  padding: 18px;
+  border: 2px solid var(--glow-color);
+  border-radius: 14px;
+  background: rgba(6, 18, 43, 0.94);
+  box-shadow: 0 0 16px rgba(var(--glow-color-rgb-R), var(--glow-color-rgb-G), var(--glow-color-rgb-B), 0.5);
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.siteMessageCard h2 {
+  margin: 0 0 6px;
+  color: #e6d7ff;
+  font-size: 1.2rem;
+  text-shadow: 0 0 8px var(--glow-color);
+}
+
+.siteMessageKind {
+  margin: 0 0 12px;
+  color: #b89de6;
+  font-size: 0.82rem;
+  font-weight: bold;
+}
+
+.siteMessageBody {
+  margin: 0 0 14px;
+  color: #f0eaff;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  user-select: text;
+}
+
+.siteMessageCard small {
+  color: #b89de6;
+}
+
+.siteNewsCard {
+  border-color: #b388ff;
+}
+
+.siteDirectMessageCard {
+  border-color: rgba(var(--glow-color-rgb-R), var(--glow-color-rgb-G), var(--glow-color-rgb-B), 0.75);
+}
+
+/* Top-corner news notice */
+.newsBanner {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 10000;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  width: min(420px, calc(100vw - 32px));
+  max-height: min(40vh, 300px);
+  overflow: auto;
+  padding: 15px 14px 15px 18px;
+  border: 2px solid var(--glow-color);
+  border-radius: 14px;
+  background: rgba(6, 18, 43, 0.97);
+  color: #e6e9ff;
+  text-align: left;
+  box-shadow: 0 0 22px rgba(var(--glow-color-rgb-R), var(--glow-color-rgb-G), var(--glow-color-rgb-B), 0.7);
+  backdrop-filter: blur(10px);
+}
+
+.newsBannerContent {
+  min-width: 0;
+  flex: 1;
+}
+
+.newsBannerContent strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #e6d7ff;
+  font-size: 1rem;
+  text-shadow: 0 0 8px var(--glow-color);
+  overflow-wrap: anywhere;
+}
+
+.newsBannerContent p {
+  margin: 0;
+  color: #ded3f4;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+#newsBannerClose {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid rgba(200, 168, 240, 0.55);
+  border-radius: 8px;
+  background: transparent;
+  color: #e6d7ff;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+#newsBannerClose:hover,
+#newsBannerClose:focus-visible {
+  background: var(--glow-color);
+  color: #fff;
+  outline: none;
+  box-shadow: 0 0 10px var(--glow-color);
+}
+
+/* Admin message and news composer */
+.adminMessageForm {
+  width: 90%;
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 18px;
+  box-sizing: border-box;
+  border: 2px solid var(--glow-color);
+  border-radius: 14px;
+  background: rgba(6, 18, 43, 0.95);
+  box-shadow: 0 0 18px rgba(var(--glow-color-rgb-R), var(--glow-color-rgb-G), var(--glow-color-rgb-B), 0.45);
+  text-align: left;
+}
+
+.adminMessageForm input[type="text"],
+.adminMessageForm textarea,
+.adminMessageForm select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 2px solid var(--glow-color);
+  border-radius: 9px;
+  background: var(--dark-blue-bg);
+  color: #e6d7ff;
+  outline: none;
+  box-shadow: inset 0 0 6px rgba(var(--glow-color-rgb-R), var(--glow-color-rgb-G), var(--glow-color-rgb-B), 0.35);
+}
+
+.adminMessageForm textarea {
+  min-height: 130px;
+  resize: vertical;
+}
+
+.adminMessageForm input:focus,
+.adminMessageForm textarea:focus,
+.adminMessageForm select:focus {
+  box-shadow: 0 0 14px var(--glow-color);
+}
+
+#adminMessageStatus {
+  min-height: 20px;
+  margin: 12px 0 0;
+  color: #c8a8f0;
+  line-height: 1.4;
+}
+
+#adminMessageSubmit {
+  border-color: var(--glow-color);
+  background: var(--glow-color);
+  color: white;
+}
+
+#adminMessageSubmit:hover:not(:disabled) {
+  box-shadow: 0 0 14px var(--glow-color);
+}
+
+#adminMessageSubmit:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 #proxyContent {
@@ -1204,6 +1440,7 @@ img {
 
 #gamesContent::-webkit-scrollbar,
 #appsContent::-webkit-scrollbar,
+#messagesContent::-webkit-scrollbar,
 #requestContent::-webkit-scrollbar,
 #adminDashboard::-webkit-scrollbar {
   width: 8px;
@@ -1211,6 +1448,7 @@ img {
 
 #gamesContent::-webkit-scrollbar-track,
 #appsContent::-webkit-scrollbar-track,
+#messagesContent::-webkit-scrollbar-track,
 #requestContent::-webkit-scrollbar-track,
 #adminDashboard::-webkit-scrollbar-track {
   background: var(--dark-blue-bg);
@@ -1218,6 +1456,7 @@ img {
 
 #gamesContent::-webkit-scrollbar-thumb,
 #appsContent::-webkit-scrollbar-thumb,
+#messagesContent::-webkit-scrollbar-thumb,
 #requestContent::-webkit-scrollbar-thumb,
 #adminDashboard::-webkit-scrollbar-thumb {
   background: var(--glow-color);
@@ -1306,7 +1545,6 @@ img {
   border-color: rgba(220, 53, 69, 0.8);
   color: #ffd1d6;
 }
-
 
 .aiTextPart {
   white-space: pre-wrap;
@@ -1434,7 +1672,6 @@ img {
   animation: aiFloat 4s ease-in-out infinite;
 }
 
-
 .aiChatMessage {
   animation: messagePop 0.18s ease both;
 }
@@ -1488,7 +1725,6 @@ img {
   }
 }
 
-
 .linksAppCard {
   align-items: flex-start;
 }
@@ -1507,4 +1743,39 @@ img {
 .linksAppLink:hover {
   color: #fff;
   text-shadow: 0 0 8px var(--glow-color);
+}
+
+@media (max-width: 700px) {
+  .newsBanner {
+    top: 10px;
+    right: 10px;
+    width: calc(100vw - 20px);
+    max-height: 35vh;
+  }
+
+  .adminMessageForm {
+    width: calc(100% - 24px);
+    padding: 14px;
+  }
+
+  .adminTable {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  #messagesContent,
+  #requestContent {
+    padding: 28px 12px;
+  }
+
+  .gamesTopBar {
+    width: calc(100% - 24px);
+  }
+
+  .linksContainer {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 12px;
+    padding: 0 12px;
+  }
 }
