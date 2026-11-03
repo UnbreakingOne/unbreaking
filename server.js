@@ -21,6 +21,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const port = process.env.PORT || 4000;
 const SESSION_DURATION_MS = 24 * 60 * 60 * 1000;
+const MAX_GAME_FILE_BYTES = 10 * 1024 * 1024;
+const MAX_GAME_FILE_DATA_CHARS = Math.ceil(MAX_GAME_FILE_BYTES * 4 / 3) + 256;
 
 function getPathExport(moduleValue) {
   if (typeof moduleValue === "string") return moduleValue;
@@ -97,13 +99,9 @@ function resolvePublicPath() {
 }
 
 const publicPath = resolvePublicPath();
-
-const NEON_URL =
-  process.env.NEON_URL;
-
+const NEON_URL = process.env.NEON_URL;
 const SECRET_KEY =
   process.env.SECRET_KEY || "shadow-sites-plus-super-secret-key";
-
 const GROQ_API_KEY = process.env.GROQ_API_KEY || "";
 const GROQ_MODEL = process.env.GROQ_MODEL || "openai/gpt-oss-120b";
 
@@ -130,6 +128,7 @@ Object.assign(wisp.options, {
 });
 
 const fastify = Fastify({
+  bodyLimit: 20 * 1024 * 1024,
   serverFactory: (handler) => {
     return createServer()
       .on("request", (req, res) => {
@@ -206,6 +205,8 @@ try {
       target_url TEXT DEFAULT '',
       html_code TEXT DEFAULT '',
       icon_data TEXT DEFAULT '',
+      file_data TEXT DEFAULT '',
+      file_name VARCHAR(255) DEFAULT '',
       created_at TIMESTAMPTZ DEFAULT NOW()
     );
   `);
@@ -213,15 +214,31 @@ try {
   await pool.query(
     "ALTER TABLE custom_games ADD COLUMN IF NOT EXISTS is_published BOOLEAN DEFAULT false"
   );
+  await pool.query(
+    "ALTER TABLE custom_games ADD COLUMN IF NOT EXISTS file_data TEXT DEFAULT ''"
+  );
+  await pool.query(
+    "ALTER TABLE custom_games ADD COLUMN IF NOT EXISTS file_name VARCHAR(255) DEFAULT ''"
+  );
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS site_messages (
+      id SERIAL PRIMARY KEY,
+      recipient_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      kind VARCHAR(20) NOT NULL CHECK (kind IN ('message', 'news')),
+      title VARCHAR(255) NOT NULL,
+      body TEXT NOT NULL,
+      created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
 
   await pool.query(
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS google_subject VARCHAR(255) UNIQUE"
   );
-
   await pool.query(
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS session_expires_at BIGINT DEFAULT 0"
   );
-
   await pool.query(
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS reauth_required BOOLEAN DEFAULT false"
   );
@@ -464,9 +481,7 @@ fastify.post("/auth/google", async (request, reply) => {
       role: user.role,
       username: user.username,
     });
-
   } catch (err) {
-    // IMPORTANT: Log the actual reason Google authentication failed.
     console.error("GOOGLE LOGIN ERROR:", err);
 
     if (err.code === "23505") {
@@ -553,17 +568,13 @@ fastify.post("/requests", async (request, reply) => {
   } = request.body ?? {};
 
   if (!requestType || !subject || !details) {
-    return reply
-      .code(400)
-      .send({
-        error:
-          "Request type, subject, and details are required.",
-      });
+    return reply.code(400).send({
+      error: "Request type, subject, and details are required.",
+    });
   }
 
   try {
-    const decoded =
-      await verifyActiveToken(token);
+    const decoded = await verifyActiveToken(token);
 
     const userLookup = await pool.query(
       "SELECT username FROM users WHERE id = $1",
@@ -589,8 +600,7 @@ fastify.post("/requests", async (request, reply) => {
     );
 
     return reply.send({
-      message:
-        "Your request was submitted successfully.",
+      message: "Your request was submitted successfully.",
     });
   } catch {
     return reply.code(401).send({
@@ -598,6 +608,135 @@ fastify.post("/requests", async (request, reply) => {
     });
   }
 });
+
+/*
+ * Authenticated users get their direct messages and all site-wide news.
+ * The frontend can display news in a dismissible banner and show messages
+ * in the Messages app.
+ */
+fastify.get("/messages", async (request, reply) => {
+  const token = getBearerToken(request);
+
+  if (!token) {
+    return reply.code(401).send({ error: "Unauthorized" });
+  }
+
+  try {
+    const decoded = await verifyActiveToken(token);
+    const result = await pool.query(
+      `SELECT m.id, m.kind, m.title, m.body, m.created_at,
+              u.username AS sender
+       FROM site_messages m
+       LEFT JOIN users u ON u.id = m.created_by
+       WHERE m.kind = 'news' OR m.recipient_id = $1
+       ORDER BY m.created_at DESC, m.id DESC`,
+      [decoded.id]
+    );
+
+    return reply.send({ messages: result.rows });
+  } catch {
+    return reply.code(401).send({ error: "Unauthorized" });
+  }
+});
+
+/*
+ * Admins can send a direct message with { kind: "message", userId, title, body }
+ * or publish site-wide news with { kind: "news", title, body }.
+ */
+fastify.post(
+  "/admin/messages",
+  { preHandler: verifyAdmin },
+  async (request, reply) => {
+    const { kind, userId, title, body } = request.body ?? {};
+    const messageKind = kind === "news" ? "news" : "message";
+    const safeTitle = String(title || "").trim().slice(0, 255);
+    const safeBody = String(body || "").trim().slice(0, 5000);
+
+    if (!safeTitle || !safeBody) {
+      return reply.code(400).send({
+        error: "A title and message body are required.",
+      });
+    }
+
+    let recipientId = null;
+
+    if (messageKind === "message") {
+      recipientId = Number(userId);
+
+      if (!Number.isInteger(recipientId) || recipientId <= 0) {
+        return reply.code(400).send({
+          error: "Select a valid recipient for a direct message.",
+        });
+      }
+    }
+
+    try {
+      const token = getBearerToken(request);
+      const admin = await verifyActiveToken(token);
+
+      if (messageKind === "message") {
+        const recipient = await pool.query(
+          "SELECT id FROM users WHERE id = $1",
+          [recipientId]
+        );
+
+        if (!recipient.rowCount) {
+          return reply.code(404).send({ error: "User not found." });
+        }
+      }
+
+      await pool.query(
+        `INSERT INTO site_messages
+         (recipient_id, kind, title, body, created_by)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [recipientId, messageKind, safeTitle, safeBody, admin.id]
+      );
+
+      return reply.send({
+        message:
+          messageKind === "news"
+            ? "News posted."
+            : "Message sent.",
+      });
+    } catch {
+      return reply.code(500).send({
+        error: "Could not save the message.",
+      });
+    }
+  }
+});
+
+function normalizeCustomGame(row) {
+  return {
+    name: row.name || "",
+    customId: `cg-${row.id}`,
+    type: ["html", "file"].includes(row.game_type)
+      ? row.game_type
+      : "url",
+    url: row.target_url || "",
+    html: row.html_code || "",
+    fileData: row.file_data || "",
+    fileName: row.file_name || "",
+    icon: row.icon_data || "",
+    published: Boolean(row.is_published),
+  };
+}
+
+function isValidGameFileData(fileData) {
+  if (typeof fileData !== "string") return false;
+  if (fileData.length > MAX_GAME_FILE_DATA_CHARS) return false;
+
+  const match = fileData.match(
+    /^data:[a-zA-Z0-9.+-]+\/[a-zA-Z0-9.+-]+;base64,([A-Za-z0-9+/]*={0,2})$/
+  );
+
+  if (!match) return false;
+
+  const encoded = match[1];
+  const estimatedBytes = Math.floor(encoded.length * 3 / 4);
+
+  return estimatedBytes <= MAX_GAME_FILE_BYTES;
+}
 
 fastify.get("/custom-games", async (request, reply) => {
   const token = getBearerToken(request);
@@ -609,32 +748,21 @@ fastify.get("/custom-games", async (request, reply) => {
   }
 
   try {
-    const decoded =
-      await verifyActiveToken(token);
+    const decoded = await verifyActiveToken(token);
 
     const result = await pool.query(
       `SELECT id, name, game_type, target_url,
-              html_code, icon_data, is_published
+              html_code, icon_data, file_data, file_name,
+              is_published
        FROM custom_games
        WHERE user_id = $1
        ORDER BY id ASC`,
       [decoded.id]
     );
 
-    const games = result.rows.map((row) => ({
-      name: row.name || "",
-      customId: `cg-${row.id}`,
-      type:
-        row.game_type === "html"
-          ? "html"
-          : "url",
-      url: row.target_url || "",
-      html: row.html_code || "",
-      icon: row.icon_data || "",
-      published: Boolean(row.is_published),
-    }));
-
-    return reply.send({ games });
+    return reply.send({
+      games: result.rows.map(normalizeCustomGame),
+    });
   } catch {
     return reply.code(401).send({
       error: "Unauthorized",
@@ -659,60 +787,99 @@ fastify.post("/custom-games", async (request, reply) => {
     });
   }
 
-  try {
-    const decoded =
-      await verifyActiveToken(token);
+  const normalizedGames = [];
 
-    await pool.query(
-      "DELETE FROM custom_games WHERE user_id = $1",
-      [decoded.id]
-    );
+  for (const game of games) {
+    const name = String(game?.name || "").trim().slice(0, 255);
+    if (!name) continue;
 
-    for (const game of games) {
-      const name =
-        String(game?.name || "")
-          .trim()
-          .slice(0, 255);
+    const gameType =
+      game?.type === "html" || game?.type === "file"
+        ? game.type
+        : "url";
 
-      const gameType =
-        game?.type === "html"
-          ? "html"
-          : "url";
+    const targetUrl = String(game?.url || "").trim();
+    const htmlCode = String(game?.html || "");
+    const iconData = String(game?.icon || "").trim();
+    const fileData = String(game?.fileData || "");
+    const fileName = String(game?.fileName || "")
+      .replace(/[\\/\r\n"]/g, "_")
+      .trim()
+      .slice(0, 255);
+    const published = Boolean(game?.published);
 
-      const targetUrl =
-        String(game?.url || "").trim();
-
-      const htmlCode =
-        String(game?.html || "").trim();
-
-      const iconData =
-        String(game?.icon || "").trim();
-
-      const published =
-        Boolean(game?.published);
-
-      if (!name) continue;
-
-      await pool.query(
-        `INSERT INTO custom_games
-         (user_id, name, game_type, target_url,
-          html_code, icon_data, is_published)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [
-          decoded.id,
-          name,
-          gameType,
-          targetUrl,
-          htmlCode,
-          iconData,
-          published,
-        ]
-      );
+    if (gameType === "html" && htmlCode.length > MAX_GAME_FILE_BYTES) {
+      return reply.code(413).send({
+        error: "HTML game files must be 10 MB or smaller.",
+      });
     }
 
-    return reply.send({
-      message: "Custom games saved.",
+    if (gameType === "file" && !isValidGameFileData(fileData)) {
+      return reply.code(400).send({
+        error: "Uploaded files must be valid files no larger than 10 MB.",
+      });
+    }
+
+    if (gameType === "file" && !fileName) {
+      return reply.code(400).send({
+        error: "A filename is required for uploaded game files.",
+      });
+    }
+
+    normalizedGames.push({
+      name,
+      gameType,
+      targetUrl,
+      htmlCode: gameType === "html" ? htmlCode : "",
+      iconData,
+      fileData: gameType === "file" ? fileData : "",
+      fileName: gameType === "file" ? fileName : "",
+      published,
     });
+  }
+
+  try {
+    const decoded = await verifyActiveToken(token);
+    const client = await pool.connect();
+
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        "DELETE FROM custom_games WHERE user_id = $1",
+        [decoded.id]
+      );
+
+      for (const game of normalizedGames) {
+        await client.query(
+          `INSERT INTO custom_games
+           (user_id, name, game_type, target_url, html_code,
+            icon_data, file_data, file_name, is_published)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          [
+            decoded.id,
+            game.name,
+            game.gameType,
+            game.targetUrl,
+            game.htmlCode,
+            game.iconData,
+            game.fileData,
+            game.fileName,
+            game.published,
+          ]
+        );
+      }
+
+      await client.query("COMMIT");
+      return reply.send({ message: "Custom games saved." });
+    } catch (err) {
+      await client.query("ROLLBACK");
+      console.error("CUSTOM GAME SAVE ERROR:", err);
+      return reply.code(500).send({
+        error: "Could not save custom games.",
+      });
+    } finally {
+      client.release();
+    }
   } catch {
     return reply.code(401).send({
       error: "Unauthorized",
@@ -724,9 +891,9 @@ fastify.get("/public-games", async (_request, reply) => {
   try {
     const result = await pool.query(
       `SELECT g.id, g.user_id, g.name,
-              g.game_type, g.target_url,
-              g.html_code, g.icon_data,
-              u.username
+              g.game_type, g.target_url, g.html_code,
+              g.icon_data, g.file_data, g.file_name,
+              g.is_published, u.username
        FROM custom_games g
        LEFT JOIN users u ON u.id = g.user_id
        WHERE g.is_published = true
@@ -734,18 +901,9 @@ fastify.get("/public-games", async (_request, reply) => {
     );
 
     const games = result.rows.map((row) => ({
-      customId: `cg-${row.id}`,
+      ...normalizeCustomGame(row),
       ownerId: row.user_id,
-      ownerUsername:
-        row.username || "Unknown User",
-      name: row.name || "",
-      type:
-        row.game_type === "html"
-          ? "html"
-          : "url",
-      url: row.target_url || "",
-      html: row.html_code || "",
-      icon: row.icon_data || "",
+      ownerUsername: row.username || "Unknown User",
       published: true,
     }));
 
@@ -786,8 +944,7 @@ fastify.get(
     try {
       const result = await pool.query(
         `SELECT id, username, request_type,
-                subject, details, page_url,
-                created_at
+                subject, details, page_url, created_at
          FROM request_submissions
          ORDER BY created_at DESC, id DESC`
       );
@@ -805,18 +962,12 @@ fastify.post(
   "/admin/action",
   { preHandler: verifyAdmin },
   async (request, reply) => {
-    const {
-      userId,
-      action,
-      reason,
-    } = request.body ?? {};
+    const { userId, action, reason } = request.body ?? {};
 
     try {
       if (action === "ban") {
         const safeReason =
-          (reason || "")
-            .toString()
-            .trim() ||
+          String(reason || "").trim() ||
           "No reason provided";
 
         await pool.query(
@@ -832,9 +983,7 @@ fastify.post(
         );
       }
 
-      return reply.send({
-        message: "Success",
-      });
+      return reply.send({ message: "Success" });
     } catch {
       return reply.code(500).send({
         error: "Database error",
@@ -850,9 +999,8 @@ fastify.get(
     try {
       const result = await pool.query(
         `SELECT g.id, g.user_id, u.username,
-                g.name, g.game_type,
-                g.target_url, g.is_published,
-                g.created_at
+                g.name, g.game_type, g.target_url,
+                g.file_name, g.is_published, g.created_at
          FROM custom_games g
          LEFT JOIN users u ON u.id = g.user_id
          ORDER BY g.id DESC`
@@ -871,18 +1019,10 @@ fastify.post(
   "/admin/custom-games/action",
   { preHandler: verifyAdmin },
   async (request, reply) => {
-    const {
-      gameId,
-      action,
-    } = request.body ?? {};
+    const { gameId, action } = request.body ?? {};
+    const parsedGameId = Number(gameId);
 
-    const parsedGameId =
-      Number(gameId);
-
-    if (
-      !Number.isInteger(parsedGameId) ||
-      parsedGameId <= 0
-    ) {
+    if (!Number.isInteger(parsedGameId) || parsedGameId <= 0) {
       return reply.code(400).send({
         error: "Valid gameId is required.",
       });
@@ -895,9 +1035,7 @@ fastify.post(
           [parsedGameId]
         );
 
-        return reply.send({
-          message: "Game published.",
-        });
+        return reply.send({ message: "Game published." });
       }
 
       if (action === "unpublish") {
@@ -906,9 +1044,7 @@ fastify.post(
           [parsedGameId]
         );
 
-        return reply.send({
-          message: "Game unpublished.",
-        });
+        return reply.send({ message: "Game unpublished." });
       }
 
       if (action === "delete") {
@@ -917,9 +1053,7 @@ fastify.post(
           [parsedGameId]
         );
 
-        return reply.send({
-          message: "Game deleted.",
-        });
+        return reply.send({ message: "Game deleted." });
       }
 
       return reply.code(400).send({
@@ -959,13 +1093,11 @@ function sanitizeAiMessages(messages) {
 fastify.post(
   "/ai/chat",
   async (request, reply) => {
-    const token =
-      getBearerToken(request);
+    const token = getBearerToken(request);
 
     if (!token) {
       return reply.code(401).send({
-        error:
-          "Please log in to use Tempest AI.",
+        error: "Please log in to use Tempest AI.",
       });
     }
 
@@ -973,8 +1105,7 @@ fastify.post(
       await verifyActiveToken(token);
     } catch {
       return reply.code(401).send({
-        error:
-          "Please log in again to use Tempest AI.",
+        error: "Please log in again to use Tempest AI.",
       });
     }
 
@@ -985,19 +1116,14 @@ fastify.post(
       });
     }
 
-    const messages =
-      sanitizeAiMessages(
-        request.body?.messages
-      );
+    const messages = sanitizeAiMessages(request.body?.messages);
 
     if (
       !messages.length ||
-      messages[messages.length - 1].role !==
-        "user"
+      messages[messages.length - 1].role !== "user"
     ) {
       return reply.code(400).send({
-        error:
-          "Send a message for Tempest AI to answer.",
+        error: "Send a message for Tempest AI to answer.",
       });
     }
 
@@ -1007,10 +1133,8 @@ fastify.post(
         {
           method: "POST",
           headers: {
-            "Content-Type":
-              "application/json",
-            Authorization:
-              `Bearer ${GROQ_API_KEY}`,
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${GROQ_API_KEY}`,
           },
           body: JSON.stringify({
             model: GROQ_MODEL,
@@ -1028,19 +1152,14 @@ fastify.post(
         }
       );
 
-      const data =
-        await groqResponse
-          .json()
-          .catch(() => ({}));
+      const data = await groqResponse.json().catch(() => ({}));
 
       if (!groqResponse.ok) {
-        return reply
-          .code(groqResponse.status)
-          .send({
-            error:
-              data?.error?.message ||
-              "Unbreaking AI could not answer right now.",
-          });
+        return reply.code(groqResponse.status).send({
+          error:
+            data?.error?.message ||
+            "Unbreaking AI could not answer right now.",
+        });
       }
 
       const replyText =
@@ -1048,219 +1167,110 @@ fastify.post(
 
       if (!replyText) {
         return reply.code(502).send({
-          error:
-            "Unbreaking AI returned an empty answer.",
+          error: "Unbreaking AI returned an empty answer.",
         });
       }
 
       return reply.send({
         reply: replyText,
-        model:
-          data?.model ||
-          GROQ_MODEL,
+        model: data?.model || GROQ_MODEL,
       });
     } catch {
       return reply.code(502).send({
-        error:
-          "Could not reach Unbreaking AI right now.",
+        error: "Could not reach Unbreaking AI right now.",
       });
     }
   }
 );
 
-fastify.get(
-  "/",
-  async (_request, reply) => {
-    return reply.sendFile("index.html");
+fastify.get("/", async (_request, reply) => {
+  return reply.sendFile("index.html");
+});
+
+fastify.get("/p", async (_request, reply) => {
+  return reply.type("text/html").sendFile("proxy.html");
+});
+
+fastify.get("/music-files", async (_request, reply) => {
+  try {
+    const musicDir = path.join(publicPath, "music");
+    const items = await fs.promises.readdir(musicDir, {
+      withFileTypes: true,
+    });
+
+    const files = items
+      .filter((item) => item.isFile())
+      .map((item) => item.name)
+      .sort((a, b) => a.localeCompare(b));
+
+    return reply.send({ files });
+  } catch {
+    return reply.code(500).send({
+      error: "Could not load music files.",
+    });
   }
-);
+});
 
-fastify.get(
-  "/p",
-  async (_request, reply) => {
-    return reply
-      .type("text/html")
-      .sendFile("proxy.html");
+fastify.get("/proxy", async (_request, reply) => {
+  return reply.redirect(301, "/p");
+});
+
+fastify.get("/app/*", async (request, reply) => {
+  const appPath = request.params["*"] || "";
+  return reply.redirect(301, `/game/${appPath}`);
+});
+
+fastify.setNotFoundHandler((request, reply) => {
+  const pathname = request.raw.url?.split("?")[0] ?? "";
+  const decodedPath = decodeURIComponent(pathname);
+  const isStartupProxyPath =
+    /^(?:\/p)?\/search\/.+/i.test(decodedPath);
+  const lastPathSegment = pathname.split("/").pop() ?? "";
+  const hasFileExtension = /\.[a-z0-9]{2,8}$/i.test(lastPathSegment);
+  const normalizedPath = decodedPath.replace(/^\/+/, "");
+
+  if (
+    pathname.startsWith("/admin/") ||
+    pathname === "/auth/google" ||
+    pathname === "/heartbeat" ||
+    pathname === "/offline" ||
+    pathname === "/requests" ||
+    pathname === "/messages" ||
+    pathname === "/ai/chat" ||
+    pathname === "/custom-games" ||
+    pathname === "/public-games"
+  ) {
+    return reply.code(404).send({ error: "Not Found" });
   }
-);
 
-fastify.get(
-  "/music-files",
-  async (_request, reply) => {
-    try {
-      const musicDir =
-        path.join(
-          publicPath,
-          "music"
-        );
+  if (isStartupProxyPath) {
+    return reply.type("text/html").sendFile("proxy.html");
+  }
 
-      const items =
-        await fs.promises.readdir(
-          musicDir,
-          { withFileTypes: true }
-        );
+  if (!hasFileExtension && normalizedPath) {
+    const htmlFileCandidate = `${normalizedPath}.html`;
+    const htmlFilePath = path.join(publicPath, htmlFileCandidate);
 
-      const files = items
-        .filter(
-          (item) => item.isFile()
-        )
-        .map(
-          (item) => item.name
-        )
-        .sort(
-          (a, b) =>
-            a.localeCompare(b)
-        );
-
-      return reply.send({
-        files,
-      });
-    } catch {
-      return reply.code(500).send({
-        error:
-          "Could not load music files.",
-      });
+    if (fs.existsSync(htmlFilePath)) {
+      return reply.type("text/html").sendFile(htmlFileCandidate);
     }
   }
-);
 
-fastify.get(
-  "/proxy",
-  async (_request, reply) => {
-    return reply.redirect(
-      301,
-      "/p"
-    );
+  if (!hasFileExtension) {
+    return reply.type("text/html").sendFile("index.html");
   }
-);
 
-fastify.get(
-  "/app/*",
-  async (request, reply) => {
-    const appPath =
-      request.params["*"] ||
-      "";
-
-    return reply.redirect(
-      301,
-      `/game/${appPath}`
-    );
-  }
-);
-
-fastify.setNotFoundHandler(
-  (request, reply) => {
-    const pathname =
-      request.raw.url
-        ?.split("?")[0] ?? "";
-
-    const decodedPath =
-      decodeURIComponent(
-        pathname
-      );
-
-    const isStartupProxyPath =
-      /^(?:\/p)?\/search\/.+/i.test(
-        decodedPath
-      );
-
-    const lastPathSegment =
-      pathname
-        .split("/")
-        .pop() ?? "";
-
-    const hasFileExtension =
-      /\.[a-z0-9]{2,8}$/i.test(
-        lastPathSegment
-      );
-
-    const normalizedPath =
-      decodedPath.replace(
-        /^\/+/,
-        ""
-      );
-
-    if (
-      pathname.startsWith(
-        "/admin/"
-      ) ||
-      pathname ===
-        "/auth/google" ||
-      pathname ===
-        "/heartbeat" ||
-      pathname ===
-        "/offline" ||
-      pathname ===
-        "/requests" ||
-      pathname ===
-        "/ai/chat" ||
-      pathname ===
-        "/custom-games" ||
-      pathname ===
-        "/public-games"
-    ) {
-      return reply
-        .code(404)
-        .send({
-          error: "Not Found",
-        });
-    }
-
-    if (isStartupProxyPath) {
-      return reply
-        .type("text/html")
-        .sendFile("proxy.html");
-    }
-
-    if (
-      !hasFileExtension &&
-      normalizedPath
-    ) {
-      const htmlFileCandidate =
-        `${normalizedPath}.html`;
-
-      const htmlFilePath =
-        path.join(
-          publicPath,
-          htmlFileCandidate
-        );
-
-      if (
-        fs.existsSync(
-          htmlFilePath
-        )
-      ) {
-        return reply
-          .type("text/html")
-          .sendFile(
-            htmlFileCandidate
-          );
-      }
-    }
-
-    if (!hasFileExtension) {
-      return reply
-        .type("text/html")
-        .sendFile("index.html");
-    }
-
-    return reply
-      .code(404)
-      .type("text/html")
-      .sendFile("404.html");
-  }
-);
+  return reply.code(404).type("text/html").sendFile("404.html");
+});
 
 const start = async () => {
   try {
     await fastify.listen({
-      port: port,
+      port,
       host: "0.0.0.0",
     });
 
-    console.log(
-      `Server running on port ${port}`
-    );
+    console.log(`Server running on port ${port}`);
   } catch (err) {
     console.error(err);
     process.exit(1);
