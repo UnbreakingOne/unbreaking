@@ -20,48 +20,44 @@
 
     <div id="authOverlay">
         <div id="authBox">
-
             <h2 id="authTitle">Log In to Unbreaking</h2>
-
             <div id="authMessage"></div>
-
             <p class="authHelp">Sign in with Google to continue.</p>
             <div id="googleSignInButton" class="googleSignInButton"></div>
-
         </div>
     </div>
 
     <div id="sspModalOverlay" class="sspModalOverlay">
         <div class="sspModalBox" role="dialog" aria-modal="true">
-
             <h3 id="sspModalTitle" class="sspModalTitle"></h3>
-
             <p id="sspModalText" class="sspModalText"></p>
-
             <textarea id="sspModalInput"
                 class="sspModalInput"
                 style="display:none;"
                 maxlength="500"></textarea>
-
             <div class="sspModalButtons">
                 <button id="sspModalCancel" class="sspModalBtn">Cancel</button>
                 <button id="sspModalConfirm" class="sspModalBtn primary">Confirm</button>
             </div>
-
         </div>
     </div>
 
-    <canvas id="particleCanvas"></canvas>
+    <div id="newsBanner" class="newsBanner" role="status" aria-live="polite" style="display:none;">
+        <div class="newsBannerContent">
+            <strong id="newsBannerTitle"></strong>
+            <p id="newsBannerBody"></p>
+        </div>
+        <button id="newsBannerClose" type="button" aria-label="Close news notice">×</button>
+    </div>
 
+    <canvas id="particleCanvas"></canvas>
     <div id="clock"></div>
 
     <section id="aiChatWidget" aria-label="Tempest AI chat">
         <button id="aiChatHideBtn" type="button" aria-label="Hide AI chat">−</button>
-
         <div id="aiChatMessages" aria-live="polite">
             <div class="aiChatMessage aiMessage">Hey, I am Unbreaking AI. Ask me anything and I will help.</div>
         </div>
-
         <form id="aiChatForm" autocomplete="off">
             <textarea id="aiChatInput"
                 rows="2"
@@ -69,11 +65,9 @@
                 placeholder="Ask Unbreaking AI..."></textarea>
             <button id="aiChatSend" type="submit">Send</button>
         </form>
-
     </section>
 
     <div id="sideNavBar">
-
         <h1 id="titleHeader" class="nav-title">Home</h1>
 
         <button onclick="fullscreenFrame()" class="topBtn">⛶</button>
@@ -93,14 +87,17 @@
             <span>Apps</span>
         </a>
 
+        <a class="nav-item" onclick="showMessages()">
+            <img src="/images/messages.png" alt="Messages">
+            <span>Messages</span>
+        </a>
+
         <a class="nav-item" onclick="showRequest()">
             <img src="/images/request.png" alt="Request/Report">
             <span>Request/Report</span>
         </a>
 
-
         <img id="settingsIcon" src="/images/settings.png" alt="Settings">
-
     </div>
 
     <div id="userDropdown">
@@ -108,7 +105,6 @@
     </div>
 
     <div id="settingsMenu">
-
         <h3>General</h3>
 
         <label>
@@ -158,24 +154,18 @@
             Asteroids
         </button>
 
-
         <button class="tool-btn"
             id="adminPanelBtn"
             style="display:none;"
             onclick="showAdmin()">
-
             Admin Panel
-
         </button>
-
     </div>
 
     <div id="mainContent">
 
         <!-- HOME -->
-
         <div id="homeContent">
-
             <h1 id="homeTitle">Unbreaking</h1>
 
             <form id="homeSearchForm" autocomplete="off">
@@ -195,13 +185,10 @@
                 <small>The images, games, and apps on this site are not mine and belong to their owners. Made By TempestBlock.</small>
                 <a href="https://github.com/UnbreakingOne/unbreaking" target="_blank" rel="noopener noreferrer">View the project on GitHub</a>
             </footer>
-
         </div>
 
         <!-- ADMIN -->
-
         <div id="adminDashboard">
-
             <h1>Admin Controls</h1>
 
             <div class="adminSectionTitle">Users</div>
@@ -213,7 +200,6 @@
             </div>
 
             <table class="adminTable">
-
                 <thead>
                     <tr>
                         <th>Username</th>
@@ -223,17 +209,53 @@
                         <th>Actions</th>
                     </tr>
                 </thead>
-
                 <tbody id="adminUserTableBody"></tbody>
-
             </table>
 
-            <div class="adminSectionTitle">
-                Custom Games
-            </div>
+            <div class="adminSectionTitle">Send a message or post news</div>
+
+            <form id="adminMessageForm" class="adminMessageForm">
+                <div class="addGameField">
+                    <label for="adminMessageKind">Send as</label>
+                    <select id="adminMessageKind" required>
+                        <option value="message">Direct message to a user</option>
+                        <option value="news">News for everyone</option>
+                    </select>
+                </div>
+
+                <div class="addGameField" id="adminMessageRecipientWrap">
+                    <label for="adminMessageRecipient">Recipient</label>
+                    <select id="adminMessageRecipient" required>
+                        <option value="">Select a user</option>
+                    </select>
+                </div>
+
+                <div class="addGameField">
+                    <label for="adminMessageTitle">Title</label>
+                    <input id="adminMessageTitle"
+                        type="text"
+                        maxlength="255"
+                        required
+                        placeholder="Message or news title">
+                </div>
+
+                <div class="addGameField">
+                    <label for="adminMessageBody">Message</label>
+                    <textarea id="adminMessageBody"
+                        maxlength="5000"
+                        required
+                        placeholder="Write the message or news here"></textarea>
+                </div>
+
+                <div class="addGameActions">
+                    <button id="adminMessageSubmit" type="submit">Send</button>
+                </div>
+                <p id="adminMessageStatus" role="status"></p>
+            </form>
+
+            <div class="adminSectionTitle">Custom Games</div>
 
             <table class="adminTable">
-
                 <thead>
                     <tr>
                         <th>Name</th>
@@ -245,17 +267,12 @@
                         <th>Actions</th>
                     </tr>
                 </thead>
-
                 <tbody id="adminCustomGameTableBody"></tbody>
-
             </table>
 
-            <div class="adminSectionTitle">
-                Request / Report Submissions
-            </div>
+            <div class="adminSectionTitle">Request / Report Submissions</div>
 
             <table class="adminTable">
-
                 <thead>
                     <tr>
                         <th>When</th>
@@ -266,37 +283,26 @@
                         <th>Page URL</th>
                     </tr>
                 </thead>
-
                 <tbody id="adminRequestTableBody"></tbody>
-
             </table>
-
         </div>
 
-        <!-- GAMES -->
-
+        <!-- GAMES AND APPS -->
         <div id="gamesContent">
-
             <div class="gamesTopBar">
-
                 <input type="text"
                     class="searchBar"
                     id="gamesSearchBar"
                     placeholder="Search for a game or app...">
-
                 <button id="addGameBtn" type="button">Add</button>
-
             </div>
 
             <div id="addGamePanel">
-
                 <h3>Add a custom game</h3>
 
                 <form id="addGameForm">
-
                     <div class="addGameField">
                         <label for="addGameName">Name</label>
-
                         <input id="addGameName"
                             type="text"
                             maxlength="120"
@@ -306,40 +312,51 @@
 
                     <div class="addGameField">
                         <label for="addGameType">Type</label>
-
                         <select id="addGameType">
                             <option value="url">URL</option>
-                            <option value="html">HTML</option>
+                            <option value="html">HTML code</option>
+                            <option value="file">Upload a file</option>
                         </select>
                     </div>
 
                     <div class="addGameField" id="addGameUrlWrap">
                         <label for="addGameUrl">URL / Search text</label>
-
                         <input id="addGameUrl"
                             type="text"
                             placeholder="Example: https://example.com">
+
+                        <label class="gameOptionLabel" for="addGameUnblock">
+                            <input id="addGameUnblock"
+                                type="checkbox"
+                                checked>
+                            Unblock (open this link through the proxy)
+                        </label>
+                        <p class="gameOptionHelp">
+                            When enabled, the link opens through Unbreaking's proxy. Turn it off to use the normal link.
+                        </p>
                     </div>
 
                     <div class="addGameField"
                         id="addGameHtmlWrap"
                         style="display:none">
-
                         <label for="addGameHtml">HTML code</label>
-
                         <textarea id="addGameHtml"
                             placeholder="Paste full HTML here"></textarea>
-
                         <p id="htmlHelpText">
-                            <a href="https://docs.google.com/document/d/1_FmH3BlSBQI7FGgAQL59-ZPe8eCxs35wel6JUyVaG8Q/edit?tab=t.0"
-                                target="_blank"
-                                rel="noopener noreferrer">
-
-                                Go on this doc and choose a game and click on it then copy all of the code and paste it into here
-
-                            </a>
+                            Paste the HTML for a game you have permission to use. HTML files can also be added using the file upload option.
                         </p>
+                    </div>
 
+                    <div class="addGameField"
+                        id="addGameFileWrap"
+                        style="display:none">
+                        <label for="addGameFile">Game or app file</label>
+                        <input id="addGameFile"
+                            type="file"
+                            accept=".html,.htm,.exe,.zip,.apk,.pdf,.txt,.js,.css,.wasm,*/*">
+                        <p class="gameOptionHelp">
+                            HTML files can be opened as a game. Other files, including executables, are offered as downloads and are not run by the site. Maximum file size: 10 MB.
+                        </p>
                     </div>
 
                     <div class="addGameField">
@@ -348,21 +365,13 @@
                     </div>
 
                     <div class="addGameActions">
-                        <button type="button" id="cancelAddGameBtn">
-                            Cancel
-                        </button>
-
-                        <button type="submit">
-                            Save Game
-                        </button>
+                        <button type="button" id="cancelAddGameBtn">Cancel</button>
+                        <button type="submit">Save Game</button>
                     </div>
-
                 </form>
-
             </div>
 
             <div class="linksContainer" id="gamesLinksContainer">
-
                 <div class="gameCard" onclick="loadGame('/game/amongus')">
                     <img src="/images/amongus.png" alt="Among Us">
                     <div class="gameTitle">Among Us</div>
@@ -387,7 +396,7 @@
                     <img src="/images/eaglercraft.png" alt="Eaglercraft">
                     <div class="gameTitle">Eaglercraft</div>
                 </div>
-                
+
                 <div class="gameCard" onclick="loadGame('/search/https://hexanaut.io')">
                     <img src="/images/hexanautio.png" alt="Hexanaut.io">
                     <div class="gameTitle">Hexanaut.io</div>
@@ -493,9 +502,7 @@
                     <div class="gameTitle">Yohoho Io</div>
                 </div>
 
-
-                <!-- Former Apps page items -->
-
+                <!-- Apps -->
                 <div class="gameCard" onclick="loadGame('/game/bgremover')">
                     <img src="/images/bgremover.png" alt="Background Remover">
                     <div class="gameTitle">Background Remover</div>
@@ -522,7 +529,7 @@
                 </div>
 
                 <div class="gameCard" onclick="loadGame('/search/https://iogames.space')">
-                    <img src="/images/iogames.png" alt="Io Games" onerror="this.onerror=null;this.src='/images/copterio.png';">
+                    <img src="/images/copterio.png" alt="Io Games">
                     <div class="gameTitle">Io Games</div>
                 </div>
 
@@ -547,54 +554,45 @@
                 </div>
 
                 <div class="gameCard" onclick="loadGame('/search/https://youtube.com')">
-                    <img src="/images/youtube.png" alt="Youtube" onerror="this.onerror=null;this.src='/images/webcrawler.png';">
-                    <div class="gameTitle">Youtube</div>
+                    <img src="/images/youtube.png" alt="YouTube" onerror="this.onerror=null;this.src='/images/webcrawler.png';">
+                    <div class="gameTitle">YouTube</div>
                 </div>
-
             </div>
+        </div>
 
+        <!-- MESSAGES -->
+        <div id="messagesContent">
+            <h1>Messages</h1>
+            <p id="messagesDescription">Messages from the admins and news for everyone will appear here.</p>
+            <div id="messagesStatus" role="status"></div>
+            <div id="messagesList" aria-live="polite"></div>
         </div>
 
         <!-- REQUEST -->
-
         <div id="requestContent">
-
             <h1>Request/Report</h1>
 
             <div id="requestCard">
-
-                <label class="requestFieldLabel" for="requestType">
-                    Type
-                </label>
-
+                <label class="requestFieldLabel" for="requestType">Type</label>
                 <select id="requestType" class="requestSelect">
                     <option value="request">Request</option>
                     <option value="report">Report</option>
                 </select>
 
-                <label class="requestFieldLabel" for="requestSubject">
-                    Subject
-                </label>
-
+                <label class="requestFieldLabel" for="requestSubject">Subject</label>
                 <input id="requestSubject"
                     class="requestInput"
                     type="text"
                     maxlength="255"
                     placeholder="Short title for your request/report">
 
-                <label class="requestFieldLabel" for="requestDetails">
-                    Details
-                </label>
-
+                <label class="requestFieldLabel" for="requestDetails">Details</label>
                 <textarea id="requestDetails"
                     class="requestTextarea"
                     maxlength="4000"
                     placeholder="Explain what you need or what issue happened."></textarea>
 
-                <label class="requestFieldLabel" for="requestPageUrl">
-                    Page URL (optional)
-                </label>
-
+                <label class="requestFieldLabel" for="requestPageUrl">Page URL (optional)</label>
                 <input id="requestPageUrl"
                     class="requestInput"
                     type="text"
@@ -604,21 +602,15 @@
                 <button id="requestSubmitBtn"
                     class="authBtn"
                     type="button">
-
                     Submit
-
                 </button>
 
                 <div id="requestStatus"></div>
-
             </div>
-
         </div>
 
         <!-- PROXY -->
-
         <div id="proxyContent">
-
             <iframe id="proxyIframe"
                 src="about:blank"
                 allow="fullscreen *"
@@ -626,7 +618,6 @@
                 webkitallowfullscreen
                 mozallowfullscreen>
             </iframe>
-
         </div>
 
         <iframe id="contentFrame"
@@ -635,11 +626,9 @@
             webkitallowfullscreen
             mozallowfullscreen>
         </iframe>
-
     </div>
 
     <script src="/js.js"></script>
-
 </body>
 
 </html>
