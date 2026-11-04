@@ -704,7 +704,7 @@ fastify.post(
       });
     }
   }
-});
+);
 
 function normalizeCustomGame(row) {
   return {
