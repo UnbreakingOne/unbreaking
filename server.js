@@ -23,6 +23,7 @@ const port = process.env.PORT || 4000;
 const SESSION_DURATION_MS = 24 * 60 * 60 * 1000;
 const MAX_GAME_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_GAME_FILE_DATA_CHARS = Math.ceil(MAX_GAME_FILE_BYTES * 4 / 3) + 256;
+let shiftUShortcutEnabled = false;
 
 function getPathExport(moduleValue) {
   if (typeof moduleValue === "string") return moduleValue;
@@ -184,19 +185,6 @@ try {
   `);
 
   await pool.query(`
-    CREATE TABLE IF NOT EXISTS request_submissions (
-      id SERIAL PRIMARY KEY,
-      user_id INTEGER,
-      username VARCHAR(255) NOT NULL,
-      request_type VARCHAR(50) NOT NULL,
-      subject VARCHAR(255) NOT NULL,
-      details TEXT NOT NULL,
-      page_url TEXT DEFAULT '',
-      created_at TIMESTAMPTZ DEFAULT NOW()
-    );
-  `);
-
-  await pool.query(`
     CREATE TABLE IF NOT EXISTS custom_games (
       id SERIAL PRIMARY KEY,
       user_id INTEGER NOT NULL,
@@ -207,6 +195,7 @@ try {
       icon_data TEXT DEFAULT '',
       file_data TEXT DEFAULT '',
       file_name VARCHAR(255) DEFAULT '',
+      unblock BOOLEAN DEFAULT true,
       created_at TIMESTAMPTZ DEFAULT NOW()
     );
   `);
@@ -220,13 +209,16 @@ try {
   await pool.query(
     "ALTER TABLE custom_games ADD COLUMN IF NOT EXISTS file_name VARCHAR(255) DEFAULT ''"
   );
+  await pool.query(
+    "ALTER TABLE custom_games ADD COLUMN IF NOT EXISTS unblock BOOLEAN DEFAULT true"
+  );
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS site_messages (
       id SERIAL PRIMARY KEY,
       recipient_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
       kind VARCHAR(20) NOT NULL CHECK (kind IN ('message', 'news')),
-      title VARCHAR(255) NOT NULL,
+      title VARCHAR(255) NOT NULL DEFAULT '',
       body TEXT NOT NULL,
       created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -393,11 +385,7 @@ fastify.post("/auth/google", async (request, reply) => {
 
     let user = existing.rows[0];
 
-    const username = await getGoogleUsername(
-      googleUser,
-      user?.id
-    );
-
+    const username = await getGoogleUsername(googleUser, user?.id);
     const admin = isGoogleAdmin(googleUser.email);
 
     if (user && user.is_banned) {
@@ -412,8 +400,7 @@ fastify.post("/auth/google", async (request, reply) => {
       });
     }
 
-    const sessionExpiresAt =
-      Date.now() + SESSION_DURATION_MS;
+    const sessionExpiresAt = Date.now() + SESSION_DURATION_MS;
 
     if (user) {
       await pool.query(
@@ -521,9 +508,7 @@ fastify.post("/heartbeat", async (request, reply) => {
 });
 
 fastify.post("/offline", async (request, reply) => {
-  const token =
-    getBearerToken(request) ||
-    request.body?.token;
+  const token = getBearerToken(request) || request.body?.token;
 
   if (!token) {
     return reply.code(401).send();
@@ -551,69 +536,26 @@ fastify.post("/offline", async (request, reply) => {
   return reply.code(200).send();
 });
 
-fastify.post("/requests", async (request, reply) => {
-  const token = getBearerToken(request);
-
-  if (!token) {
-    return reply.code(401).send({
-      error: "Unauthorized",
-    });
-  }
-
-  const {
-    requestType,
-    subject,
-    details,
-    pageUrl,
-  } = request.body ?? {};
-
-  if (!requestType || !subject || !details) {
-    return reply.code(400).send({
-      error: "Request type, subject, and details are required.",
-    });
-  }
-
-  try {
-    const decoded = await verifyActiveToken(token);
-
-    const userLookup = await pool.query(
-      "SELECT username FROM users WHERE id = $1",
-      [decoded.id]
-    );
-
-    const username =
-      userLookup.rows[0]?.username ||
-      "Unknown User";
-
-    await pool.query(
-      `INSERT INTO request_submissions
-       (user_id, username, request_type, subject, details, page_url)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [
-        decoded.id,
-        username,
-        requestType,
-        subject.trim(),
-        details.trim(),
-        (pageUrl || "").trim(),
-      ]
-    );
-
-    return reply.send({
-      message: "Your request was submitted successfully.",
-    });
-  } catch {
-    return reply.code(401).send({
-      error: "Unauthorized",
-    });
-  }
+fastify.get("/shortcut-setting", async (_request, reply) => {
+  return reply.send({ enabled: shiftUShortcutEnabled });
 });
 
-/*
- * Authenticated users get their direct messages and all site-wide news.
- * The frontend can display news in a dismissible banner and show messages
- * in the Messages app.
- */
+fastify.post(
+  "/shortcut-setting",
+  { preHandler: verifyAdmin },
+  async (request, reply) => {
+    const { enabled } = request.body ?? {};
+    shiftUShortcutEnabled = Boolean(enabled);
+
+    return reply.send({
+      enabled: shiftUShortcutEnabled,
+      message: shiftUShortcutEnabled
+        ? "Shift+U is now enabled."
+        : "Shift+U is now disabled.",
+    });
+  }
+);
+
 fastify.get("/messages", async (request, reply) => {
   const token = getBearerToken(request);
 
@@ -639,22 +581,20 @@ fastify.get("/messages", async (request, reply) => {
   }
 });
 
-/*
- * Admins can send a direct message with { kind: "message", userId, title, body }
- * or publish site-wide news with { kind: "news", title, body }.
- */
 fastify.post(
   "/admin/messages",
   { preHandler: verifyAdmin },
   async (request, reply) => {
     const { kind, userId, title, body } = request.body ?? {};
     const messageKind = kind === "news" ? "news" : "message";
-    const safeTitle = String(title || "").trim().slice(0, 255);
+    const safeTitle =
+      String(title || "").trim().slice(0, 255) ||
+      (messageKind === "news" ? "News" : "Message");
     const safeBody = String(body || "").trim().slice(0, 5000);
 
-    if (!safeTitle || !safeBody) {
+    if (!safeBody) {
       return reply.code(400).send({
-        error: "A title and message body are required.",
+        error: "A message body is required.",
       });
     }
 
@@ -718,6 +658,7 @@ function normalizeCustomGame(row) {
     fileData: row.file_data || "",
     fileName: row.file_name || "",
     icon: row.icon_data || "",
+    unblock: row.unblock !== false,
     published: Boolean(row.is_published),
   };
 }
@@ -753,7 +694,7 @@ fastify.get("/custom-games", async (request, reply) => {
     const result = await pool.query(
       `SELECT id, name, game_type, target_url,
               html_code, icon_data, file_data, file_name,
-              is_published
+              is_published, unblock
        FROM custom_games
        WHERE user_id = $1
        ORDER BY id ASC`,
@@ -807,6 +748,7 @@ fastify.post("/custom-games", async (request, reply) => {
       .trim()
       .slice(0, 255);
     const published = Boolean(game?.published);
+    const unblock = game?.unblock !== false;
 
     if (gameType === "html" && htmlCode.length > MAX_GAME_FILE_BYTES) {
       return reply.code(413).send({
@@ -835,6 +777,7 @@ fastify.post("/custom-games", async (request, reply) => {
       fileData: gameType === "file" ? fileData : "",
       fileName: gameType === "file" ? fileName : "",
       published,
+      unblock,
     });
   }
 
@@ -853,8 +796,8 @@ fastify.post("/custom-games", async (request, reply) => {
         await client.query(
           `INSERT INTO custom_games
            (user_id, name, game_type, target_url, html_code,
-            icon_data, file_data, file_name, is_published)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+            icon_data, file_data, file_name, is_published, unblock)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
           [
             decoded.id,
             game.name,
@@ -865,6 +808,7 @@ fastify.post("/custom-games", async (request, reply) => {
             game.fileData,
             game.fileName,
             game.published,
+            game.unblock,
           ]
         );
       }
@@ -893,7 +837,7 @@ fastify.get("/public-games", async (_request, reply) => {
       `SELECT g.id, g.user_id, g.name,
               g.game_type, g.target_url, g.html_code,
               g.icon_data, g.file_data, g.file_name,
-              g.is_published, u.username
+              g.is_published, g.unblock, u.username
        FROM custom_games g
        LEFT JOIN users u ON u.id = g.user_id
        WHERE g.is_published = true
@@ -923,30 +867,9 @@ fastify.get(
       const result = await pool.query(
         `SELECT id, username, email, role,
                 is_approved, is_banned,
-                ban_reason, is_online
+                ban_reason, is_online, last_seen
          FROM users
          ORDER BY id ASC`
-      );
-
-      return reply.send(result.rows);
-    } catch {
-      return reply.code(500).send({
-        error: "Database error",
-      });
-    }
-  }
-);
-
-fastify.get(
-  "/admin/requests",
-  { preHandler: verifyAdmin },
-  async (_request, reply) => {
-    try {
-      const result = await pool.query(
-        `SELECT id, username, request_type,
-                subject, details, page_url, created_at
-         FROM request_submissions
-         ORDER BY created_at DESC, id DESC`
       );
 
       return reply.send(result.rows);
@@ -1234,11 +1157,11 @@ fastify.setNotFoundHandler((request, reply) => {
     pathname === "/auth/google" ||
     pathname === "/heartbeat" ||
     pathname === "/offline" ||
-    pathname === "/requests" ||
     pathname === "/messages" ||
     pathname === "/ai/chat" ||
     pathname === "/custom-games" ||
-    pathname === "/public-games"
+    pathname === "/public-games" ||
+    pathname === "/shortcut-setting"
   ) {
     return reply.code(404).send({ error: "Not Found" });
   }
