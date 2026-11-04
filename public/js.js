@@ -70,9 +70,10 @@
     const shortcutSettingStatus = document.getElementById('shortcutSettingStatus');
 
     const newsBanner = document.getElementById('newsBanner');
-    const newsBannerTitle = document.getElementById('newsBannerTitle');
-    const newsBannerBody = document.getElementById('newsBannerBody');
     const newsBannerClose = document.getElementById('newsBannerClose');
+
+    const SEEN_NEWS_KEY = 'seenNewsIds';
+    const NEWS_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
     let heartbeatInterval;
     let messageRefreshInterval;
@@ -81,6 +82,8 @@
     let adminCustomGamesCache = [];
     let editingCustomGameId = '';
     let siteMessagesCache = [];
+    let shortcutEnabled = false;
+    let bannerDismissedIds = new Set();
     const aiConversation = [];
 
     function updateGlowColorRgb() {
@@ -181,11 +184,6 @@
         aiChatWidget.style.display = shouldShowAiChat() ? 'flex' : 'none';
     }
 
-    function getAuthHeaders() {
-        const token = localStorage.getItem('token');
-        return token ? { Authorization: `Bearer ${token}` } : {};
-    }
-
     function checkLoginStatus() {
         const token = localStorage.getItem('token');
         const role = localStorage.getItem('role');
@@ -207,12 +205,13 @@
             userMenuWrap.style.display = 'none';
             userDropdown.style.display = 'none';
             adminPanelBtn.style.display = 'none';
-            newsBanner.style.display = 'none';
+            if (newsBanner) newsBanner.style.display = 'none';
             updateAiChatVisibility();
             if (heartbeatInterval) clearInterval(heartbeatInterval);
             if (messageRefreshInterval) clearInterval(messageRefreshInterval);
             clearRenderedCustomGames();
             siteMessagesCache = [];
+            bannerDismissedIds.clear();
             if (messagesList) messagesList.replaceChildren();
         }
 
@@ -311,8 +310,7 @@
 
     function formatLastSeen(lastSeen) {
         if (!lastSeen || Number(lastSeen) <= 0) return 'Never';
-        const value = Number(lastSeen);
-        const date = new Date(value);
+        const date = new Date(Number(lastSeen));
         if (Number.isNaN(date.getTime())) return 'Unknown';
         return new Intl.DateTimeFormat(undefined, {
             dateStyle: 'medium',
@@ -457,20 +455,19 @@
                     ? (game.file_name || 'Uploaded file')
                     : (game.target_url || 'No URL');
 
-            const cells = [
+            [
                 game.name || '',
                 game.username || 'Unknown User',
                 game.game_type || '',
                 target
-            ];
-
-            cells.forEach((value) => {
+            ].forEach((value) => {
                 const cell = document.createElement('td');
                 cell.textContent = value;
                 row.appendChild(cell);
             });
 
             row.appendChild(status);
+
             const created = document.createElement('td');
             created.textContent = new Date(game.created_at).toLocaleString();
             row.appendChild(created);
@@ -557,27 +554,30 @@
         try {
             const response = await fetch('/shortcut-setting');
             if (!response.ok) throw new Error('Could not load shortcut setting.');
-            const data = await response.json();
-            const enabled = Boolean(data?.enabled);
 
-            toggleShortcutButton.textContent = enabled
+            const data = await response.json();
+            shortcutEnabled = data?.enabled === true;
+
+            toggleShortcutButton.textContent = shortcutEnabled
                 ? 'Disable Shift+U'
                 : 'Enable Shift+U';
-            shortcutSettingStatus.textContent = enabled
+            toggleShortcutButton.classList.add('adminActionBtn');
+            toggleShortcutButton.classList.toggle('btn-ban', shortcutEnabled);
+            toggleShortcutButton.classList.toggle('btn-approve', !shortcutEnabled);
+
+            shortcutSettingStatus.textContent = shortcutEnabled
                 ? 'Shift+U is enabled on index.html.'
                 : 'Shift+U is disabled on index.html.';
         } catch (_) {
-            toggleShortcutButton.textContent = 'Enable Shift+U';
             shortcutSettingStatus.textContent = 'Could not load shortcut status.';
         }
     }
 
     async function toggleShortcutSetting() {
         const token = localStorage.getItem('token');
+        if (!token || !isCurrentUserAdmin()) return;
 
-        if (!token || !isCurrentUserAdmin()) {
-            return;
-        }
+        if (toggleShortcutButton) toggleShortcutButton.disabled = true;
 
         try {
             const response = await fetch('/shortcut-setting', {
@@ -586,59 +586,128 @@
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${token}`
                 },
-                body: JSON.stringify({
-                    enabled: !(toggleShortcutButton?.textContent || '').includes('Disable')
-                })
+                body: JSON.stringify({ enabled: !shortcutEnabled })
             });
 
+            const data = await response.json().catch(() => ({}));
             if (!response.ok) {
-                const data = await response.json().catch(() => ({}));
                 throw new Error(data.error || 'Could not update shortcut setting.');
             }
 
             await refreshShortcutSetting();
         } catch (error) {
             alert(error.message || 'Could not update shortcut setting.');
+        } finally {
+            if (toggleShortcutButton) toggleShortcutButton.disabled = false;
         }
     }
 
-    function getDismissedNewsIds() {
+    function getSeenNewsIds() {
         try {
-            const ids = JSON.parse(localStorage.getItem('dismissedNewsIds') || '[]');
+            const ids = JSON.parse(localStorage.getItem(SEEN_NEWS_KEY) || '[]');
             return new Set(Array.isArray(ids) ? ids.map(String) : []);
         } catch (_) {
             return new Set();
         }
     }
 
+    function getUnreadRecentNews() {
+        const seenIds = getSeenNewsIds();
+        const cutoff = Date.now() - NEWS_MAX_AGE_MS;
+
+        return siteMessagesCache
+            .filter((message) => {
+                if (message.kind !== 'news' || seenIds.has(String(message.id))) {
+                    return false;
+                }
+
+                const createdAt = new Date(message.created_at).getTime();
+                return Number.isFinite(createdAt) &&
+                    createdAt <= Date.now() &&
+                    createdAt >= cutoff;
+            })
+            .sort((first, second) =>
+                new Date(second.created_at).getTime() -
+                new Date(first.created_at).getTime()
+            );
+    }
+
+    function markNewsAsSeen(messageId) {
+        const seenIds = getSeenNewsIds();
+        seenIds.add(String(messageId));
+        localStorage.setItem(SEEN_NEWS_KEY, JSON.stringify([...seenIds]));
+        bannerDismissedIds.delete(String(messageId));
+
+        showLatestNewsBanner();
+
+        if (messagesContent && messagesContent.style.display === 'block') {
+            renderMessages();
+        }
+    }
+
+    function createNewsCard(message) {
+        const card = document.createElement('article');
+        card.className = 'siteMessageCard siteNewsCard';
+
+        const heading = document.createElement('h2');
+        heading.textContent = 'News';
+
+        const body = document.createElement('p');
+        body.className = 'siteMessageBody';
+        body.textContent = message.body || '';
+
+        const details = document.createElement('small');
+        details.textContent = message.created_at
+            ? new Date(message.created_at).toLocaleString()
+            : '';
+
+        const seenButton = document.createElement('button');
+        seenButton.type = 'button';
+        seenButton.className = 'adminActionBtn btn-approve';
+        seenButton.textContent = 'Mark as seen';
+        seenButton.addEventListener('click', () => markNewsAsSeen(message.id));
+
+        card.append(heading, body, details, seenButton);
+        return card;
+    }
+
     function showLatestNewsBanner() {
         if (!newsBanner) return;
 
-        const dismissed = getDismissedNewsIds();
-        const latestNews = siteMessagesCache.find((message) =>
-            message.kind === 'news' && !dismissed.has(String(message.id))
-        );
+        const unreadNews = getUnreadRecentNews()
+            .filter((message) => !bannerDismissedIds.has(String(message.id)));
+        const content = newsBanner.querySelector('.newsBannerContent');
 
-        if (!latestNews) {
+        if (!unreadNews.length || !content) {
             newsBanner.style.display = 'none';
             return;
         }
 
-        newsBannerTitle.textContent = latestNews.title || 'News';
-        newsBannerBody.textContent = latestNews.body || '';
-        newsBanner.dataset.messageId = String(latestNews.id);
+        content.replaceChildren();
+
+        const heading = document.createElement('strong');
+        heading.textContent = 'New announcements';
+
+        const list = document.createElement('div');
+        list.className = 'newsAnnouncementList';
+        list.style.display = 'flex';
+        list.style.flexDirection = 'column';
+        list.style.gap = '10px';
+
+        unreadNews.forEach((message) => {
+            list.appendChild(createNewsCard(message));
+        });
+
+        content.append(heading, list);
         newsBanner.style.display = 'flex';
     }
 
     if (newsBannerClose) {
         newsBannerClose.addEventListener('click', () => {
-            const messageId = newsBanner.dataset.messageId;
-            if (messageId) {
-                const dismissed = getDismissedNewsIds();
-                dismissed.add(String(messageId));
-                localStorage.setItem('dismissedNewsIds', JSON.stringify([...dismissed]));
-            }
-            showLatestNewsBanner();
+            getUnreadRecentNews().forEach((message) => {
+                bannerDismissedIds.add(String(message.id));
+            });
+            newsBanner.style.display = 'none';
         });
     }
 
@@ -674,29 +743,43 @@
         if (!messagesList) return;
         messagesList.replaceChildren();
 
-        if (!siteMessagesCache.length) {
-            messagesStatus.textContent = 'You do not have any messages yet.';
+        const news = getUnreadRecentNews();
+        const directMessages = siteMessagesCache
+            .filter((message) => message.kind !== 'news')
+            .sort((first, second) =>
+                new Date(second.created_at).getTime() -
+                new Date(first.created_at).getTime()
+            );
+
+        if (!news.length && !directMessages.length) {
+            messagesStatus.textContent = 'You do not have any new messages.';
             return;
         }
 
         messagesStatus.textContent = '';
 
-        siteMessagesCache.forEach((message) => {
+        news.forEach((message) => {
+            messagesList.appendChild(createNewsCard(message));
+        });
+
+        directMessages.forEach((message) => {
             const card = document.createElement('article');
-            card.className = 'siteMessageCard';
-            card.classList.add(message.kind === 'news' ? 'siteNewsCard' : 'siteDirectMessageCard');
+            card.className = 'siteMessageCard siteDirectMessageCard';
 
             const kind = document.createElement('p');
             kind.className = 'siteMessageKind';
-            kind.textContent = message.kind === 'news' ? 'News for everyone' : 'Admin message';
+            kind.textContent = 'Admin message';
 
             const body = document.createElement('p');
             body.className = 'siteMessageBody';
             body.textContent = message.body || '';
 
             const details = document.createElement('small');
-            const date = message.created_at ? new Date(message.created_at).toLocaleString() : '';
-            details.textContent = `${message.sender ? `From ${message.sender} · ` : ''}${date}`;
+            const date = message.created_at
+                ? new Date(message.created_at).toLocaleString()
+                : '';
+            details.textContent =
+                `${message.sender ? `From ${message.sender} · ` : ''}${date}`;
 
             card.append(kind, body, details);
             messagesList.appendChild(card);
@@ -738,7 +821,9 @@
                 body: adminMessageBody.value.trim()
             };
 
-            if (kind !== 'news') payload.userId = Number(adminMessageRecipient.value);
+            if (kind !== 'news') {
+                payload.userId = Number(adminMessageRecipient.value);
+            }
 
             if (!payload.body || (kind !== 'news' && !payload.userId)) {
                 adminMessageStatus.textContent = 'Choose a recipient and enter a message.';
@@ -746,7 +831,8 @@
             }
 
             adminMessageSubmit.disabled = true;
-            adminMessageStatus.textContent = kind === 'news' ? 'Posting news…' : 'Sending message…';
+            adminMessageStatus.textContent =
+                kind === 'news' ? 'Posting news…' : 'Sending message…';
 
             try {
                 const response = await fetch('/admin/messages', {
@@ -768,7 +854,8 @@
                 setAdminMessageKindUi();
                 if (kind === 'news') await loadMessages();
             } catch (error) {
-                adminMessageStatus.textContent = error.message || 'Could not send this message.';
+                adminMessageStatus.textContent =
+                    error.message || 'Could not send this message.';
             } finally {
                 adminMessageSubmit.disabled = false;
             }
@@ -1740,6 +1827,7 @@
     applyExtraSettings(savedExtra);
 
     if (toggleShortcutButton) {
+        toggleShortcutButton.classList.add('adminActionBtn');
         toggleShortcutButton.addEventListener('click', toggleShortcutSetting);
     }
 
@@ -1921,15 +2009,12 @@
         const frame = document.getElementById('contentFrame');
         const proxy = document.getElementById('proxyIframe');
         const proxyWrap = document.getElementById('proxyContent');
-        const request = document.getElementById('requestContent');
         const messages = document.getElementById('messagesContent');
 
         let active = null;
         if (frame.classList.contains('is-frame-active')) active = frame;
         else if (proxy.classList.contains('is-frame-active') || proxyWrap.style.display === 'block') active = proxy;
-        else if (request.style.display === 'block' || messages?.style.display === 'block') {
-            active = document.documentElement;
-        }
+        else if (messages?.style.display === 'block') active = document.documentElement;
 
         if (!active) return;
 
@@ -1943,7 +2028,6 @@
     window.refreshFrame = function () {
         const frame = document.getElementById('contentFrame');
         const proxy = document.getElementById('proxyIframe');
-        const request = document.getElementById('requestContent');
 
         if (frame.classList.contains('is-frame-active')) {
             frame.src = frame.src;
@@ -1952,8 +2036,6 @@
             document.getElementById('proxyContent').style.display === 'block'
         ) {
             proxy.src = proxy.src;
-        } else if (request.style.display === 'block') {
-            request.scrollTo({ top: 0, behavior: 'smooth' });
         } else if (messagesContent?.style.display === 'block') {
             loadMessages();
         }
