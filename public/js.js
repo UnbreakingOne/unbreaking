@@ -34,18 +34,11 @@
     const messagesContent = document.getElementById('messagesContent');
     const messagesList = document.getElementById('messagesList');
     const messagesStatus = document.getElementById('messagesStatus');
-    const requestContent = document.getElementById('requestContent');
     const proxyContent = document.getElementById('proxyContent');
     const adminDashboard = document.getElementById('adminDashboard');
     const contentFrame = document.getElementById('contentFrame');
     const titleHeader = document.getElementById('titleHeader');
     const proxyIframe = document.getElementById('proxyIframe');
-    const requestType = document.getElementById('requestType');
-    const requestSubject = document.getElementById('requestSubject');
-    const requestDetails = document.getElementById('requestDetails');
-    const requestPageUrl = document.getElementById('requestPageUrl');
-    const requestSubmitBtn = document.getElementById('requestSubmitBtn');
-    const requestStatus = document.getElementById('requestStatus');
     const homeSearchForm = document.getElementById('homeSearchForm');
     const homeSearchInput = document.getElementById('homeSearchInput');
     const gamesLinksContainer = document.getElementById('gamesLinksContainer');
@@ -69,10 +62,12 @@
     const adminMessageKind = document.getElementById('adminMessageKind');
     const adminMessageRecipient = document.getElementById('adminMessageRecipient');
     const adminMessageRecipientWrap = document.getElementById('adminMessageRecipientWrap');
-    const adminMessageTitle = document.getElementById('adminMessageTitle');
     const adminMessageBody = document.getElementById('adminMessageBody');
     const adminMessageStatus = document.getElementById('adminMessageStatus');
     const adminMessageSubmit = document.getElementById('adminMessageSubmit');
+
+    const toggleShortcutButton = document.getElementById('toggleShortcutButton');
+    const shortcutSettingStatus = document.getElementById('shortcutSettingStatus');
 
     const newsBanner = document.getElementById('newsBanner');
     const newsBannerTitle = document.getElementById('newsBannerTitle');
@@ -314,6 +309,17 @@
         userLogoutBtn.innerText = 'Log Out';
     });
 
+    function formatLastSeen(lastSeen) {
+        if (!lastSeen || Number(lastSeen) <= 0) return 'Never';
+        const value = Number(lastSeen);
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return 'Unknown';
+        return new Intl.DateTimeFormat(undefined, {
+            dateStyle: 'medium',
+            timeStyle: 'short',
+        }).format(date);
+    }
+
     async function loadAdminData() {
         const token = localStorage.getItem('token');
 
@@ -327,7 +333,7 @@
             populateAdminMessageRecipients();
         } catch (_) {
             const tbody = document.getElementById('adminUserTableBody');
-            tbody.innerHTML = '<tr><td colspan="5">Could not load users.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6">Could not load users.</td></tr>';
         }
     }
 
@@ -373,6 +379,7 @@
                 const row = document.createElement('tr');
                 const status = document.createElement('td');
                 const online = document.createElement('td');
+                const lastOnline = document.createElement('td');
                 const actions = document.createElement('td');
 
                 status.textContent = user.is_banned ? 'BANNED' : 'Active';
@@ -381,6 +388,9 @@
                 badge.className = `statusBadge ${user.is_online ? 'online' : 'offline'}`;
                 badge.textContent = user.is_online ? 'Online' : 'Offline';
                 online.appendChild(badge);
+
+                lastOnline.textContent =
+                    user.is_online ? 'Online now' : formatLastSeen(user.last_seen);
 
                 const username = document.createElement('td');
                 username.textContent = user.username || '';
@@ -401,43 +411,9 @@
                     actions.appendChild(button);
                 }
 
-                row.append(username, email, status, online, actions);
+                row.append(username, email, status, online, lastOnline, actions);
                 tbody.appendChild(row);
             });
-    }
-
-    async function loadAdminRequests() {
-        const token = localStorage.getItem('token');
-
-        try {
-            const response = await fetch('/admin/requests', {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            if (!response.ok) throw new Error('Could not load requests.');
-            const requests = await response.json();
-            const tbody = document.getElementById('adminRequestTableBody');
-            tbody.innerHTML = '';
-
-            requests.forEach((item) => {
-                const row = document.createElement('tr');
-                [
-                    new Date(item.created_at).toLocaleString(),
-                    item.username,
-                    item.request_type,
-                    item.subject,
-                    item.details,
-                    item.page_url || ''
-                ].forEach((value) => {
-                    const cell = document.createElement('td');
-                    cell.textContent = value || '';
-                    row.appendChild(cell);
-                });
-                tbody.appendChild(row);
-            });
-        } catch (_) {
-            document.getElementById('adminRequestTableBody').innerHTML =
-                '<tr><td colspan="6">Could not load requests.</td></tr>';
-        }
     }
 
     async function loadAdminCustomGames() {
@@ -575,6 +551,57 @@
         loadAdminData();
     };
 
+    async function refreshShortcutSetting() {
+        if (!toggleShortcutButton || !shortcutSettingStatus) return;
+
+        try {
+            const response = await fetch('/shortcut-setting');
+            if (!response.ok) throw new Error('Could not load shortcut setting.');
+            const data = await response.json();
+            const enabled = Boolean(data?.enabled);
+
+            toggleShortcutButton.textContent = enabled
+                ? 'Disable Shift+U'
+                : 'Enable Shift+U';
+            shortcutSettingStatus.textContent = enabled
+                ? 'Shift+U is enabled on index.html.'
+                : 'Shift+U is disabled on index.html.';
+        } catch (_) {
+            toggleShortcutButton.textContent = 'Enable Shift+U';
+            shortcutSettingStatus.textContent = 'Could not load shortcut status.';
+        }
+    }
+
+    async function toggleShortcutSetting() {
+        const token = localStorage.getItem('token');
+
+        if (!token || !isCurrentUserAdmin()) {
+            return;
+        }
+
+        try {
+            const response = await fetch('/shortcut-setting', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    enabled: !(toggleShortcutButton?.textContent || '').includes('Disable')
+                })
+            });
+
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.error || 'Could not update shortcut setting.');
+            }
+
+            await refreshShortcutSetting();
+        } catch (error) {
+            alert(error.message || 'Could not update shortcut setting.');
+        }
+    }
+
     function getDismissedNewsIds() {
         try {
             const ids = JSON.parse(localStorage.getItem('dismissedNewsIds') || '[]');
@@ -659,9 +686,6 @@
             card.className = 'siteMessageCard';
             card.classList.add(message.kind === 'news' ? 'siteNewsCard' : 'siteDirectMessageCard');
 
-            const heading = document.createElement('h2');
-            heading.textContent = message.title || (message.kind === 'news' ? 'News' : 'Message');
-
             const kind = document.createElement('p');
             kind.className = 'siteMessageKind';
             kind.textContent = message.kind === 'news' ? 'News for everyone' : 'Admin message';
@@ -674,7 +698,7 @@
             const date = message.created_at ? new Date(message.created_at).toLocaleString() : '';
             details.textContent = `${message.sender ? `From ${message.sender} · ` : ''}${date}`;
 
-            card.append(heading, kind, body, details);
+            card.append(kind, body, details);
             messagesList.appendChild(card);
         });
     }
@@ -711,14 +735,13 @@
             const kind = adminMessageKind.value;
             const payload = {
                 kind,
-                title: adminMessageTitle.value.trim(),
                 body: adminMessageBody.value.trim()
             };
 
             if (kind !== 'news') payload.userId = Number(adminMessageRecipient.value);
 
-            if (!payload.title || !payload.body || (kind !== 'news' && !payload.userId)) {
-                adminMessageStatus.textContent = 'Choose a recipient and enter a title and message.';
+            if (!payload.body || (kind !== 'news' && !payload.userId)) {
+                adminMessageStatus.textContent = 'Choose a recipient and enter a message.';
                 return;
             }
 
@@ -1365,7 +1388,6 @@
         homeContent.style.display = 'none';
         gamesContent.style.display = 'none';
         if (messagesContent) messagesContent.style.display = 'none';
-        requestContent.style.display = 'none';
         proxyContent.style.display = 'none';
         adminDashboard.style.display = 'none';
         contentFrame.style.display = 'block';
@@ -1408,11 +1430,6 @@
         contentFrame.src = '';
     };
 
-    window.showRequest = function () {
-        hideAllSections();
-        requestContent.style.display = 'block';
-    };
-
     window.showProxy = function () {
         hideAllSections();
         activateEmbeddedFrame(proxyIframe);
@@ -1426,67 +1443,11 @@
         adminDashboard.style.display = 'block';
         settingsMenu.style.display = 'none';
         loadAdminData();
-        loadAdminRequests();
         loadAdminCustomGames();
+        refreshShortcutSetting();
     };
 
     document.getElementById('adminSearchBar').addEventListener('input', renderAdminTable);
-
-    requestSubmitBtn.addEventListener('click', async () => {
-        const token = localStorage.getItem('token');
-        if (!token) {
-            requestStatus.innerText = 'Please log in first.';
-            requestStatus.style.color = '#ff4d4d';
-            return;
-        }
-
-        const payload = {
-            requestType: requestType.value,
-            subject: requestSubject.value.trim(),
-            details: requestDetails.value.trim(),
-            pageUrl: requestPageUrl.value.trim()
-        };
-
-        if (!payload.subject || !payload.details) {
-            requestStatus.innerText = 'Subject and details are required.';
-            requestStatus.style.color = '#ff4d4d';
-            return;
-        }
-
-        requestSubmitBtn.disabled = true;
-        requestSubmitBtn.innerText = 'Submitting...';
-        requestStatus.innerText = '';
-
-        try {
-            const response = await fetch('/requests', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`
-                },
-                body: JSON.stringify(payload)
-            });
-            const data = await response.json();
-
-            if (response.ok) {
-                requestStatus.innerText = data.message || 'Submitted successfully.';
-                requestStatus.style.color = '#28a745';
-                requestSubject.value = '';
-                requestDetails.value = '';
-                requestPageUrl.value = '';
-            } else {
-                requestStatus.innerText =
-                    data.error || 'Could not submit request. Please try again.';
-                requestStatus.style.color = '#ff4d4d';
-            }
-        } catch (_) {
-            requestStatus.innerText = 'Server error. Please try again.';
-            requestStatus.style.color = '#ff4d4d';
-        } finally {
-            requestSubmitBtn.disabled = false;
-            requestSubmitBtn.innerText = 'Submit';
-        }
-    });
 
     function appendAiTextWithCode(parent, text) {
         const codeBlockPattern = /```([^\n`]*)\n?([\s\S]*?)```/g;
@@ -1777,6 +1738,10 @@
     loadMusicTracks();
     applySettings(saved);
     applyExtraSettings(savedExtra);
+
+    if (toggleShortcutButton) {
+        toggleShortcutButton.addEventListener('click', toggleShortcutSetting);
+    }
 
     window.addEventListener('contextmenu', (event) => event.preventDefault());
 
