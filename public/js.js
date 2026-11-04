@@ -72,7 +72,8 @@
     const newsBanner = document.getElementById('newsBanner');
     const newsBannerClose = document.getElementById('newsBannerClose');
 
-    const SEEN_NEWS_KEY = 'seenNewsIds';
+    const NEWS_VIEW_COUNTS_KEY = 'newsViewCounts';
+    const NEWS_VIEWED_THIS_SESSION_KEY = 'newsViewedThisSession';
     const NEWS_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
     let heartbeatInterval;
@@ -602,9 +603,22 @@
         }
     }
 
-    function getSeenNewsIds() {
+    function getNewsViewCounts() {
         try {
-            const ids = JSON.parse(localStorage.getItem(SEEN_NEWS_KEY) || '[]');
+            const counts = JSON.parse(localStorage.getItem(NEWS_VIEW_COUNTS_KEY) || '{}');
+            return counts && typeof counts === 'object' && !Array.isArray(counts)
+                ? counts
+                : {};
+        } catch (_) {
+            return {};
+        }
+    }
+
+    function getNewsViewedThisSession() {
+        try {
+            const ids = JSON.parse(
+                sessionStorage.getItem(NEWS_VIEWED_THIS_SESSION_KEY) || '[]'
+            );
             return new Set(Array.isArray(ids) ? ids.map(String) : []);
         } catch (_) {
             return new Set();
@@ -612,37 +626,51 @@
     }
 
     function getUnreadRecentNews() {
-        const seenIds = getSeenNewsIds();
-        const cutoff = Date.now() - NEWS_MAX_AGE_MS;
+        const now = Date.now();
+        const cutoff = now - NEWS_MAX_AGE_MS;
+        const counts = getNewsViewCounts();
+        const viewedThisSession = getNewsViewedThisSession();
+        const visibleNews = [];
 
-        return siteMessagesCache
+        const recentNews = siteMessagesCache
             .filter((message) => {
-                if (message.kind !== 'news' || seenIds.has(String(message.id))) {
-                    return false;
-                }
+                if (message.kind !== 'news') return false;
 
                 const createdAt = new Date(message.created_at).getTime();
                 return Number.isFinite(createdAt) &&
-                    createdAt <= Date.now() &&
+                    createdAt <= now &&
                     createdAt >= cutoff;
             })
             .sort((first, second) =>
                 new Date(second.created_at).getTime() -
                 new Date(first.created_at).getTime()
             );
-    }
 
-    function markNewsAsSeen(messageId) {
-        const seenIds = getSeenNewsIds();
-        seenIds.add(String(messageId));
-        localStorage.setItem(SEEN_NEWS_KEY, JSON.stringify([...seenIds]));
-        bannerDismissedIds.delete(String(messageId));
+        for (const message of recentNews) {
+            const id = String(message.id);
+            const viewCount = Math.max(0, Number(counts[id]) || 0);
 
-        showLatestNewsBanner();
+            if (viewedThisSession.has(id)) {
+                if (viewCount < 3) visibleNews.push(message);
+                continue;
+            }
 
-        if (messagesContent && messagesContent.style.display === 'block') {
-            renderMessages();
+            if (viewCount >= 3) continue;
+
+            counts[id] = viewCount + 1;
+            viewedThisSession.add(id);
+            visibleNews.push(message);
         }
+
+        try {
+            localStorage.setItem(NEWS_VIEW_COUNTS_KEY, JSON.stringify(counts));
+            sessionStorage.setItem(
+                NEWS_VIEWED_THIS_SESSION_KEY,
+                JSON.stringify([...viewedThisSession])
+            );
+        } catch (_) {}
+
+        return visibleNews;
     }
 
     function createNewsCard(message) {
@@ -661,13 +689,7 @@
             ? new Date(message.created_at).toLocaleString()
             : '';
 
-        const seenButton = document.createElement('button');
-        seenButton.type = 'button';
-        seenButton.className = 'adminActionBtn btn-approve';
-        seenButton.textContent = 'Mark as seen';
-        seenButton.addEventListener('click', () => markNewsAsSeen(message.id));
-
-        card.append(heading, body, details, seenButton);
+        card.append(heading, body, details);
         return card;
     }
 
