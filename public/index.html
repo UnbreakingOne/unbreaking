@@ -8,19 +8,37 @@
     Not Found
 
     <script>
-        document.addEventListener("keydown", function (event) {
-            if (event.shiftKey && event.key.toLowerCase() === "u") {
-                const win = window.open("about:blank", "_blank");
+        let shiftUEnabled = false;
 
-                if (win) {
-                    win.document.open();
-                    win.document.write(`
+        fetch("/shortcut-setting")
+            .then((response) => response.ok ? response.json() : null)
+            .then((setting) => {
+                shiftUEnabled = setting?.enabled === true;
+            })
+            .catch(() => {
+                // Fail closed: the shortcut stays disabled if the setting can't be loaded.
+                shiftUEnabled = false;
+            });
+
+        document.addEventListener("keydown", function (event) {
+            if (
+                !shiftUEnabled ||
+                !event.shiftKey ||
+                event.key.toLowerCase() !== "u"
+            ) {
+                return;
+            }
+
+            const win = window.open("about:blank", "_blank");
+
+            if (win) {
+                win.document.open();
+                win.document.write(`
                     <title>Google</title>
                     <link rel="icon" href="https://unbreakingone.onrender.com/images/google.png" type="image/x-icon">
-<iframe srcdoc='<iframe src="https://unbreakingone.onrender.com/loginhome" style="position:fixed;top:0;left:0;width:100vw;height:100vh;border:0;"></iframe>' style="position:fixed;top:0;left:0;width:100vw;height:100vh;border:0;"></iframe>
-                    `);
-                    win.document.close();
-                }
+                    <iframe srcdoc='<iframe src="https://unbreakingone.onrender.com/loginhome" style="position:fixed;top:0;left:0;width:100vw;height:100vh;border:0;"></iframe>' style="position:fixed;top:0;left:0;width:100vw;height:100vh;border:0;"></iframe>
+                `);
+                win.document.close();
             }
         });
     </script>
